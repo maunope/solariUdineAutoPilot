@@ -12,15 +12,14 @@ const int motorPulseDownPin = 8; //Pin per invio impulso negativo
 const int buttonPin = 9; //pin per comandi
 const int feedbackLedPin = 4; // pin per il led feedback esito comandi
 
-const int delayBetweenPulses=3000; 
 
 
 
 unsigned long pressedTime = 0;
 
 
-
-const int minute = 10000;
+const long delayBetweenPulses=3000; 
+const long minute = 60000;
 
 int lastGeneralEnableStatus =1;
 
@@ -28,7 +27,7 @@ int lastPulseDirection = 0;
 
 long mockEEpromMillis=0;
 
-int lastPulseTime=0;
+long lastPulseTime=0;
 
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -181,15 +180,17 @@ void loop() {
 
   if (generalEnable)
   {
-    if ( (RTMMillis-EEpromMillis>minute)   && millis()-lastPulseTime>delayBetweenPulses ) {
+    if ( (RTMMillis-EEpromMillis>minute)   && ((RTMMillis-lastPulseTime)>delayBetweenPulses) ) {
         //shoot a pulse
         //TODO make this a pulse to a 555
-        Serial.println("Sending a pulse, RTMMillis="+String(RTMMillis)+ " EEpromMillis="+String(EEpromMillis));
+        Serial.println("Sending a pulse, RTMMillis="+String(RTMMillis)+ " EEpromMillis="+String(EEpromMillis)+" lastPulseTime="+String(lastPulseTime)+" now="+String(RTMMillis)+" diff="+String(RTMMillis-lastPulseTime));
         int lastPulseDirection=getLastPulseDirection();
         sendPulse(lastPulseDirection);
         setLastPulseDirection(lastPulseDirection>0?-1:1);
-        setEEpromMillis(RTMMillis);
-        lastPulseTime=millis();
+
+        setEEpromMillis(floor((EEpromMillis/minute)*minute)+minute);
+        lastPulseTime=RTMMillis;
+
   
 
     }
