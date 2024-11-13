@@ -33,8 +33,9 @@ The following features improve durability and operation:
 - [SparkFun External EEPROM Arduino Library](https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library)
 
 ## Circuit Board
+**to be updated*
+![Solari Udine Autopilot Circuit Board]([path/to/your/image.jpg](https://github.com/maunope/solariUdineAutoPilot/blob/main/Controller%20Solari.png?raw=true))
 
-![Alt text](path/to/your/image.jpg)
 
 ## Todo
 
