@@ -45,7 +45,7 @@ The following features improve durability and operation:
 
 
 
-<img src="feedbackledpulses" width="640px" alt="Solari Udine Autopilot Circuit Board">
+<img src="feedbackledpulses.png" width="640px" alt="Feedback led pulses interpretation card">
 
 ## Todo
 - Add support for bluetooth communication
