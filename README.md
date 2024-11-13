@@ -39,8 +39,13 @@ The following features improve durability and operation:
 
 [Tinkercad design](https://www.tinkercad.com/things/edBA37nszuH-solari-udine-autopilot?sharecode=Utxk19oz_5hmAhspum-ylxp-65AgX1UbVL5bwIXLegg)
 
-<img src="Controller%20Solari.png" width="640px" alt="Solari Udine Autopilot Circuit Board">
+<img src="controllersolari.png" width="640px" alt="Solari Udine Autopilot Circuit Board">
 
+## How to read led signals
+
+
+
+<img src="feedbackledpulses.png" width="640px" alt="Feedback led pulses interpretation card">
 
 ## Todo
 - Add support for bluetooth communication
