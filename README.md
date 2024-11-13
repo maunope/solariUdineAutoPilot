@@ -19,7 +19,7 @@ A led provides visual feedback, an optional LCD1602 cab be plugged in to display
 
 The software tries to mitigate strain on the flip clock limiting the number and frequency of rollers turns:
 - Turns are limited to 1 every 3 seconds (manual step adjustment bypasses this)
-- If more than 120 roller flips would be require to catch up, movement is paused till the next day (a halted clock displays the right time once a day after all **:-)**)
+- If more than 120 roller flips would be required to catch up, movement is paused till the next day (a halted clock displays the right time once a day after all **:-)**)
 - If the eeprom or rtc module fail, no pulses are sent to the motor
 
 The following features improve durability and operation:
