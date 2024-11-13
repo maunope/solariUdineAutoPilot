@@ -1,5 +1,9 @@
-**DISCLAIMER**
-This is still a prototype, still to be tested on a real clock, use at your risk and plz don't come whining if you damage your flip clock or set your house on fire. 
+<p align="center"><img src="cifra12.png" width="320px" alt="Solari Udine Cifra 12"/></p>
+
+
+# Disclaimer
+This is still a prototype, still to be tested on a real clock, use at your risk and plz **don't come whining if you damage your flip clock or set your house on fire.**
+
 
 
 # Solari Udine Auto Pilot
