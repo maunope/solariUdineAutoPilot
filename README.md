@@ -34,7 +34,7 @@ The following features improve durability and operation:
 
 ## Circuit Board
 
-
+![Alt text](path/to/your/image.jpg)
 
 ## Todo
 
