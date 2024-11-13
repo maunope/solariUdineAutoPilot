@@ -1,4 +1,7 @@
+#include <EEPROM.h>
+
 #include <LiquidCrystal_I2C.h>
+
 #include <RTClib.h>
 
 
@@ -8,44 +11,54 @@
 //#define SECONDSOFFSET (1711850400-5) //5 secondi prima del subentro ora legale 2024
 //#define SECONDSOFFSET (1729994400-5) //5 secondi prima della fine di  ora legale 2024
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 //#define ALWAYS_DST
 //#define NEVER_DST
 //#define FAST_DEBUG
 
+const unsigned long EEPROM_SIGNATURE = 0xA24F789F; 
+const int EEPROM_PAGE_SIZE_BYTES = 4;
+const int MAX_WRITE_PER_EEPROM_PAGE = 10080; //approx one week of regular operation
+const int EEPROM_SIZE_BYTES = 1024;
 
-const int motorPulseEnablePin = 6; 
-const int motorPulseUpPin = 7; 
+struct EepromIndexDescriptor {
+  unsigned long signature;
+  int pageOffset = 0;
+};
+
+struct EepromTimeData {
+  DateTime time = DateTime(WINT_MAX);
+  int nextPulsePolarity = 0;
+  int currentWrites = 0;
+};
+
+const int motorPulseEnablePin = 6;
+const int motorPulseUpPin = 7;
 const int motorPulseDownPin = 8;
-const int pushButtonPin = 9; 
-const int feedbackLedPin = 4; 
+const int pushButtonPin = 9;
+const int feedbackLedPin = 4;
 int secsPerMinute = 60;
 
-
-unsigned long pushButtonPressedMillis = 0; 
-
+unsigned long pushButtonPressedMillis = 0;
 
 //last direction of the pulse, to be saved to EEPROM
-int nextPulseDirection = 0;
-
-//fordebug, remove
-DateTime mockEEpromTime = DateTime((uint32_t)0);
+int nextPulsePolarity = 0;
 
 //tracks last pulse sent to motor, to enforce max pace set by secsBetweenPulses
-DateTime lastPulseTime = DateTime((uint32_t)0);
+DateTime lastPulseTime = DateTime((uint32_t) 0);
 unsigned long secsBetweenPulses = 3;
 
 //duration of motor pulses, note shorter between circuit 555 timer and this applies 
-int pulseDurationMillis=300;
+int pulseDurationMillis = 300;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 RTC_DS3231 rtc;
 
 void setup() {
   #ifdef FAST_DEBUG
-    secsPerMinute = 60;
-    secsBetweenPulses = 0;
-    pulseDurationMillis=10;
+  secsPerMinute = 60;
+  secsBetweenPulses = 0;
+  pulseDurationMillis = 10;
   #endif
 
   //Init pins 
@@ -61,23 +74,17 @@ void setup() {
   //Init Serial and i2c modules
   Serial.begin(9600);
 
-  lcd.init(); 
-  lcd.backlight(); 
-  lcd.clear(); 
-  
+  lcd.init();
+  lcd.backlight();
+  lcd.clear();
+
   //Under no circumnstance read/write the RTC module when not ready!
   //if RTC is unavailabe sends a blink pattern and then resets
   if (!rtc.begin()) {
     Serial.println("RTC Error");
-    for (int i=0;i<30;i++)
-    {
-    digitalWrite(feedbackLedPin, HIGH);
-    delay(50);
-    digitalWrite(feedbackLedPin, LOW);
-    delay(300);
-    }
+    blinkFeedbackLed(50, 300, 30);
     //reset
-    asm volatile ("  jmp 0"); 
+    asm volatile("  jmp 0");
   }
 
   //if the rtc module is new, sets time. this only makes sense when connected to a PC
@@ -85,58 +92,131 @@ void setup() {
     Serial.println("Power lost, resetting time. (check battery maybe?");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
-  
-  //REMOVE ONCE FINISHED
-  //fordubug, simula messa in fase manuale, rimuovere
-  DateTime rtctime=getRTCTime();
-  setEEpromTime(rtctime-TimeSpan(rtctime.second()));
 
 }
 
-void blinkFeedbackLed(int onMillis, int offMillis, int iterations)
-{
-      for (int i = 0; i < iterations; i++) 
-      {
-        digitalWrite(feedbackLedPin, HIGH);
-        delay(onMillis);
-        digitalWrite(feedbackLedPin, LOW);
-        delay(offMillis);
-      }
-      digitalWrite(feedbackLedPin, LOW);
+//blinks the feedback led alternating given on/off time, for the given number of times. 
+void blinkFeedbackLed(int onMillis, int offMillis, int iterations) {
+  for (int i = 0; i < iterations; i++) {
+    digitalWrite(feedbackLedPin, HIGH);
+    delay(onMillis);
+    digitalWrite(feedbackLedPin, LOW);
+    delay(offMillis);
+  }
+  digitalWrite(feedbackLedPin, LOW);
+}
+
+int writeTimeDataToEeprom(EepromTimeData & eepromTimeData) {
+
+  const int eepromTimeDataPagesSizeBytes = ceil(sizeof(EepromTimeData) / (float) EEPROM_PAGE_SIZE_BYTES) * EEPROM_PAGE_SIZE_BYTES;
+  const int eepromIndexDescriptorSizeBytes = ceil(sizeof(EepromIndexDescriptor) / (float) EEPROM_PAGE_SIZE_BYTES) * EEPROM_PAGE_SIZE_BYTES;
+
+  //Serial.println(String(sizeof(EepromTimeData))+" a "+String(eepromTimeDataPagesSizeBytes)+" b "+String((sizeof(EepromIndexDescriptor)))+" c "+String(eepromIndexDescriptorSizeBytes));
+  EepromIndexDescriptor eepromIndexDescriptor;
+  eepromIndexDescriptor.signature = 0;
+
+  Serial.println(String(EEPROM_SIGNATURE, HEX) + " eepromIndexDescriptor.signature: " + String(eepromIndexDescriptor.signature, HEX) + " eepromIndexDescriptor.pageOffset: " + String(eepromIndexDescriptor.pageOffset));
+
+  //check if first 4 bytes contain the required signature string
+  EEPROM.get(0, eepromIndexDescriptor);
+
+  Serial.println(String(EEPROM_SIGNATURE, HEX) + " eepromIndexDescriptor.signature: " + String(eepromIndexDescriptor.signature, HEX) + " eepromIndexDescriptor.pageOffset: " + String(eepromIndexDescriptor.pageOffset));
+  //check if first 4 bytes contain the required signature string
+
+  if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
+    // EEPROM is not initialized, write the signature and default address and set 0 writes in counter
+    Serial.println("EEprom not initialized, setting index page");
+
+    eepromIndexDescriptor.signature = EEPROM_SIGNATURE;
+    //set to the number of bytes containing the descriptor
+    eepromIndexDescriptor.pageOffset = eepromIndexDescriptorSizeBytes;
+
+    EEPROM.put(0, eepromIndexDescriptor);
+
+    //write a blank time, setting to WINT_MAX ensures this dummy time will prevent unwanted pulses
+    EepromTimeData blankTimeData;
+    blankTimeData.time = WINT_MAX;
+    blankTimeData.nextPulsePolarity = 0;
+    blankTimeData.currentWrites = 0;
+    EEPROM.put(eepromIndexDescriptor.pageOffset, eepromIndexDescriptor);
+  }
+
+  EepromTimeData currentEepromTimeData;
+  EEPROM.get(eepromIndexDescriptor.pageOffset, currentEepromTimeData);
+
+  //switch to next page if the number of writes on the current one exceeds the desided value
+  if (currentEepromTimeData.currentWrites > MAX_WRITE_PER_EEPROM_PAGE) {
+    Serial.println(String(currentEepromTimeData.currentWrites) + " ->next page " + String(eepromIndexDescriptor.pageOffset));
+    //switch forward one page, if we reached the top, start back from seconda page (first is index) 
+    eepromIndexDescriptor.pageOffset = (eepromIndexDescriptor.pageOffset + eepromTimeDataPagesSizeBytes < EEPROM_SIZE_BYTES) ? eepromIndexDescriptor.pageOffset + eepromTimeDataPagesSizeBytes : eepromIndexDescriptorSizeBytes;
+    eepromIndexDescriptor.signature = EEPROM_SIGNATURE;
+    EEPROM.put(0, eepromIndexDescriptor);
+    //reset writes counter in currentEepromTimeData
+    eepromTimeData.currentWrites = 0;
+    Serial.println("New page offset: " + String(eepromIndexDescriptor.pageOffset));
+  } else {
+    //write to eeprom and track we have +1 write on the current page
+    eepromTimeData.currentWrites = eepromTimeData.currentWrites + 1;
+  }
+
+  EEPROM.put(eepromIndexDescriptor.pageOffset, eepromTimeData);
+
+  return 1;
+}
+
+// Function to read data from EEPROM
+int readEepromTimeData(EepromTimeData & eepromTimeData) {
+
+  EepromIndexDescriptor eepromIndexDescriptor;
+  EEPROM.get(0, eepromIndexDescriptor);
+
+  //check if first 4 bytes contain the required signature string
+  if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
+    Serial.println("EEprom is not initialized");
+    // EEPROM is not initialized, return 0
+    eepromTimeData.time = WINT_MAX;
+    eepromTimeData.nextPulsePolarity = 0;
+    return -1; // Indicate that EEPROM is not initialized
+  }
+
+  EepromTimeData timeDataFromEEprom;
+  EEPROM.get(eepromIndexDescriptor.pageOffset, eepromTimeData);
+  return 1; // Data read successfully
+
 }
 
 //returns true if give DateTime is DST, applies Central Europe rules
 bool isDST(DateTime time) {
   #ifdef DEBUG_MODE
-    #ifdef ALWAYS_DST
-    time=DateTime((String(time.year())+"-04-01%00:00:00").c_str());
-    #endif
-    #ifdef NEVER_DST
-    time=DateTime((String(time.year())+"-11-01%00:00:00").c_str());
-    #endif
+  #ifdef ALWAYS_DST
+  time = DateTime((String(time.year()) + "-04-01%00:00:00").c_str());
+  #endif
+  #ifdef NEVER_DST
+  time = DateTime((String(time.year()) + "-11-01%00:00:00").c_str());
+  #endif
   #endif
   // Calculate the last Sunday of March
-  DateTime dstStart=DateTime((String(time.year())+"-03-31%02:00:00").c_str());
+  DateTime dstStart = DateTime((String(time.year()) + "-03-31%02:00:00").c_str());
   while (dstStart.dayOfTheWeek() != 1) { // 1 represents Sunday
-    dstStart =dstStart-TimeSpan(SECONDS_PER_DAY);
+    dstStart = dstStart - TimeSpan(SECONDS_PER_DAY);
   }
-    // Calculate the last Sunday of October
-  DateTime dstEnd=DateTime((String(time.year())+"-10-31%03:00:00").c_str());
+  // Calculate the last Sunday of October
+  DateTime dstEnd = DateTime((String(time.year()) + "-10-31%03:00:00").c_str());
   while (dstEnd.dayOfTheWeek() != 1) { // 1 represents Sunday
-    dstEnd =dstEnd-TimeSpan(SECONDS_PER_DAY);
+    dstEnd = dstEnd - TimeSpan(SECONDS_PER_DAY);
   }
   return (time >= dstStart && time <= dstEnd);
 }
 
 //displays debug info on LCD
-void pulseDebugStringToDisplay(DateTime EEpromTime, DateTime RTCTime, int pulseDirection, bool motorPulseEnable, bool isDST) {
+void pulseDebugStringToDisplay(EepromTimeData eepromTimeData, DateTime RTCTime, bool motorPulseEnable, bool isDST) {
   lcd.setCursor(0, 0);
 
-  lcd.print("R:"+String(RTCTime.hour()<10?"0":"")+String(RTCTime.hour())+":"+(RTCTime.minute()<10?"0":"")+String(RTCTime.minute())+":"+(RTCTime.second()<10?"0":"")+String(RTCTime.second())+" ");
+  lcd.print("R:" + String(RTCTime.hour() < 10 ? "0" : "") + String(RTCTime.hour()) + ":" + (RTCTime.minute() < 10 ? "0" : "") + String(RTCTime.minute()) + ":" + (RTCTime.second() < 10 ? "0" : "") + String(RTCTime.second()) + " ");
   lcd.setCursor(12, 0);
-  lcd.print(String(pulseDirection == 0 ? "/" : (pulseDirection > 0 ? "+" : "-")) + " " + String(motorPulseEnable ? "E" : "D"));
+  lcd.print(String(eepromTimeData.nextPulsePolarity == 0 ? "/" : (eepromTimeData.nextPulsePolarity > 0 ? "+" : "-")) + " " + String(motorPulseEnable ? "E" : "D"));
   lcd.setCursor(0, 1);
-  lcd.print("E:"+String(EEpromTime.hour()<0?"0":"")+String(EEpromTime.hour())+":"+(EEpromTime.minute()<10?"0":"")+String(EEpromTime.minute())+":"+(EEpromTime.second()<10?"0":"")+String(EEpromTime.second())+" ");
+  lcd.print("E:" + String(eepromTimeData.time.hour() < 0 ? "0" : "") + String(eepromTimeData.time.hour()) + ":" + (eepromTimeData.time.minute() < 10 ? "0" : "") + String(eepromTimeData.time.minute()) + ":" + (eepromTimeData.time.second() < 10 ? "0" : "") + String(eepromTimeData.time.second()) + " ");
   lcd.setCursor(12, 1);
   lcd.print(isDST ? "DST" : "STD");
 }
@@ -147,133 +227,116 @@ void pulseDebugStringToDisplay(DateTime EEpromTime, DateTime RTCTime, int pulseD
 DateTime getRTCTime() {
   //return SECONDSOFFSET + (millis() / 1000);
   #ifdef DEBUG_MODE
-   if (!rtc.begin()) {
-    return DateTime((uint32_t)0);
+  if (!rtc.begin()) {
+    return DateTime((uint32_t) 0);
   }
   #endif
   return rtc.now();
 
 }
 
-//mock method
-DateTime getEEpromTime() {
-  return mockEEpromTime;
-}
-
-//mock method
-int setEEpromTime(DateTime time) {
-  mockEEpromTime = time;
-  return 1;
-}
-
-//mockmethod
-int setNextPulseDirection(int direction) {
-  nextPulseDirection = direction;
-  return 1;
-}
-
-//mockmethod
-int getNextPulseDirection() {
-  return nextPulseDirection;
-}
-
-
 //sends a pulse for to the motor for the given duration and polarity 
-//if 0 polarity is given, forces to positive
+//and updates next polarity in eepromTimeData
 //actual motor pulse won't exceed what the 555 timer in the circuit allows
-int sendPulse(int polarity, int pulseDurationMillis) {
-  
- polarity=polarity!=0?polarity:1;
+void sendPulse(EepromTimeData & eepromTimeData, int pulseDurationMillis) {
 
-    digitalWrite(motorPulseUpPin, LOW);
-    digitalWrite(motorPulseDownPin, LOW);
-    if (polarity > 0) {
-      digitalWrite(motorPulseUpPin, HIGH);
-      digitalWrite(motorPulseDownPin, LOW);
-    } else {
-      digitalWrite(motorPulseUpPin, LOW);
-      digitalWrite(motorPulseDownPin, HIGH);
-    }
-    delay(pulseDurationMillis); 
+  int polarity = eepromTimeData.nextPulsePolarity != 0 ? eepromTimeData.nextPulsePolarity : 1;
 
   digitalWrite(motorPulseUpPin, LOW);
   digitalWrite(motorPulseDownPin, LOW);
-  return polarity > 0 ? -1 : 1;
+  if (polarity > 0) {
+    digitalWrite(motorPulseUpPin, HIGH);
+    digitalWrite(motorPulseDownPin, LOW);
+  } else {
+    digitalWrite(motorPulseUpPin, LOW);
+    digitalWrite(motorPulseDownPin, HIGH);
+  }
+  delay(pulseDurationMillis);
+
+  digitalWrite(motorPulseUpPin, LOW);
+  digitalWrite(motorPulseDownPin, LOW);
+  eepromTimeData.nextPulsePolarity = polarity > 0 ? -1 : 1;
 }
 
 //returns the DST adjusted value of the given DateTime
-DateTime dstAdjustedTime(DateTime time)
-{
-  return (isDST(time)?time+TimeSpan(secsPerMinute*60):time);
+DateTime dstAdjustedTime(DateTime time) {
+  return (isDST(time) ? time + TimeSpan(secsPerMinute * 60) : time);
 }
 
 void loop() {
 
   //self reset every week, just in case I f*cked up and some variable would overflow left unchecked
-  if (millis() >= 604800000UL) { 
-    asm volatile ("  jmp 0"); 
+  if (millis() >= 604800000UL) {
+    asm volatile("  jmp 0");
   }
 
-
   bool motorPulseEnable = digitalRead(motorPulseEnablePin) == HIGH;
-  
+
   //RTCTime is the time coming from the battery backed Real Time Clock Module
   DateTime RTCTime = getRTCTime();
-  //EEPromTime is the last recorded time that was pulsed to the moto
-  DateTime EEpromTime = getEEpromTime();
-  //DST adjusted version of RTCTime
-  DateTime dstAdjRTCTime= dstAdjustedTime(RTCTime);
-  bool dst = isDST(RTCTime);
-  
-  //if the motor enable signal is turned off, don't calculate/send pulses
-  if (motorPulseEnable) {
+  //EEPromTimeData is the last recorded time, polarity and no of writes on the current eeprom page  that was pulsed to the moto
 
-    //if actual time is more than one minute ahead of what has been already pulsed to the motor, shoot one pulse
-    //pace pulses every secsBetweenPulses seconds to avoid straining the flip clock
-    if (((dstAdjRTCTime-EEpromTime).totalseconds()  > secsPerMinute) && ((RTCTime - lastPulseTime).totalseconds() > secsBetweenPulses)) {
-      //shoot a pulse
-      //TODO make this a pulse to a 555
+  EepromTimeData eepromTimeData;
+  readEepromTimeData(eepromTimeData);
+  //if EEprom has no valid time set, skip clock movement and notify user
+  if (!eepromTimeData.time.isValid()) {
+    lcd.setCursor(0, 0);
+    lcd.print("Adj. time");
+    Serial.println("No valid time set in eeprom, please adjust clock");
+    blinkFeedbackLed(300, 50, 5);
+  } else {
+    //regular operation
 
-      setNextPulseDirection(sendPulse(getNextPulseDirection(),pulseDurationMillis));
-      //record the last pulsed time, advance by one minute
-      setEEpromTime(EEpromTime + TimeSpan(secsPerMinute));
-      lastPulseTime = RTCTime;
+    //DST adjusted version of RTCTime
+    DateTime dstAdjRTCTime = dstAdjustedTime(RTCTime);
+    bool dst = isDST(RTCTime);
+
+    //if the motor enable signal is turned off, don't calculate/send pulses
+    if (motorPulseEnable) {
+      //if actual time is more than one minute ahead of what has been already pulsed to the motor, shoot one pulse
+      //pace pulses every secsBetweenPulses seconds to avoid straining the flip clock
+      if (((dstAdjRTCTime - eepromTimeData.time).totalseconds() > secsPerMinute) && ((RTCTime - lastPulseTime).totalseconds() > secsBetweenPulses)) {
+        //shoot a pulse
+        //TODO make this a pulse to a 555
+        sendPulse(eepromTimeData, pulseDurationMillis);
+        //record the last pulsed time, advance by one minute
+        eepromTimeData.time = eepromTimeData.time + TimeSpan(secsPerMinute);
+        writeTimeDataToEeprom(eepromTimeData);
+
+        lastPulseTime = RTCTime;
+
+      }
 
     }
-    
-  } 
 
-  pulseDebugStringToDisplay(EEpromTime, RTCTime, getNextPulseDirection(), motorPulseEnable, dst);
-
+    pulseDebugStringToDisplay(eepromTimeData, RTCTime, motorPulseEnable, dst);
+  }
   //handle inputs from pushbutton
   //brief press: advance flip clock by one minute
   //3 seconds press: align EEPromTime to RTCTime, to be used after manual flip clock adjustment
   if (digitalRead(pushButtonPin) == HIGH) {
-    
+
     if (pushButtonPressedMillis == 0) {
       pushButtonPressedMillis = millis();
-    } 
+    }
     //long prss
     else if (millis() - pushButtonPressedMillis >= 3000) {
       //this totals to 1 second
-      blinkFeedbackLed(100,100,5);
+      blinkFeedbackLed(100, 100, 5);
       //sets the current Secs on the eeprom to the value coming from the RTC, considering DST, setting seconds to zero
-      setEEpromTime(RTCTime-TimeSpan(RTCTime.second()));
+      eepromTimeData.time = RTCTime - TimeSpan(RTCTime.second());
+      writeTimeDataToEeprom(eepromTimeData);
       Serial.println("Manual Adjustment completed");
-      pushButtonPressedMillis = 0; 
+      pushButtonPressedMillis = 0;
     }
-  } 
+  }
   //short press
   else if (pushButtonPressedMillis > 0) {
-      pushButtonPressedMillis = 0; 
-      blinkFeedbackLed(100,0,1);
-
-      setNextPulseDirection(sendPulse(getNextPulseDirection(),pulseDurationMillis));
-      setEEpromTime(EEpromTime + TimeSpan(secsPerMinute));
-      Serial.println("Sending a manual pulse");
+    pushButtonPressedMillis = 0;
+    blinkFeedbackLed(100, 0, 1);
+    sendPulse(eepromTimeData, pulseDurationMillis);
+    eepromTimeData.time = eepromTimeData.time + TimeSpan(secsPerMinute);
+    writeTimeDataToEeprom(eepromTimeData);
+    Serial.println("Sent a manual pulse");
   }
 }
-  
-
-
-
