@@ -1,19 +1,26 @@
 //finire di verificare funzionamento orae
 
+
+
 //#define SECONDSOFFSET 1731283200 //11 Novembre 2024 00:00
 //#define SECONDSOFFSET 1722470400 //1 Agosto 2024 00:00
 //#define SECONDSOFFSET 0
-#define SECONDSOFFSET (1711850400-5) //5 secondi prima del subentro ora legale 2024
+//#define SECONDSOFFSET (1711850400-5) //5 secondi prima del subentro ora legale 2024
 //#define SECONDSOFFSET (1729994400-5) //5 secondi prima della fine di  ora legale 2024
 
 
 
-//#define FASTDEBUG
+#define DEBUG_MODE
+//#define ALWAYS_DST
+//#define NEVER_DST
+//#define FAST_DEBUG
 
 
 #include <LiquidCrystal_I2C.h>
+#include <RTClib.h>
+//#include <TimeLib.h>
 
-#include <TimeLib.h>
+
 
 
 const int generalEnablePin = 6; //Pin per arresto movimento
@@ -25,31 +32,30 @@ const int feedbackLedPin = 4; // pin per il led feedback esito comandi
 unsigned long pressedTime = 0;
  
 int secsPerMinute = 60;
-unsigned long delayBetweenPulses = 3;
+unsigned long secondsBetweenPulses = 3000;
 int pulseduration=300;
-
-
-
-
 
 
 int lastGeneralEnableStatus = 1;
 
 int lastPulseDirection = 0;
 
-time_t mockEEpromTime = 0;
+DateTime mockEEpromTime = DateTime((uint32_t)0);
 
-time_t lastPulseTime = 0;
+DateTime lastPulseTime = DateTime((uint32_t)0);
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
+RTC_DS3231 rtc;
 
 void setup() {
 
-  #ifdef FASTDEBUG
-  secsPerMinute = 60;
-  delayBetweenPulses = 0;
-  pulseduration=10;
+
+  #ifdef FAST_DEBUG
+    secsPerMinute = 60;
+    secondsBetweenPulses = 0;
+    pulseduration=10;
   #endif
+
 
   pinMode(generalEnablePin, INPUT);
   pinMode(motorPulseUpPin, OUTPUT);
@@ -62,9 +68,6 @@ void setup() {
 
   Serial.begin(9600);
 
-  
-  //fordubug, simula messa in fase manuale, rimuovere
-  setEEpromTime(floor(getRTMTime() / secsPerMinute) * secsPerMinute);
 
   lcd.init(); // initialize the lcd
   lcd.backlight(); // Turn on backlight
@@ -72,84 +75,79 @@ void setup() {
   lcd.print("                "); // Print a message to the LC
   lcd.setCursor(0, 2); // set the cursor to column 0, line 1
   lcd.print("                "); // Print a message to the LC
+
+
+
+  if (!rtc.begin()) {
+    lcd.setCursor(0, 1); // set the cursor to column 0, line 1
+    lcd.print("RTC Error");
+    Serial.println("RTC Error");
+    delay(60000);
+    asm volatile ("  jmp 0"); 
+  }
+  if (rtc.lostPower()) {
+    Serial.println("Power lost, resetting time. (check battery maybe?");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
+  //fordubug, simula messa in fase manuale, rimuovere
+  setEEpromTime(DateTime(floor(getRTCTime().secondstime() / secsPerMinute) * secsPerMinute));
+
 }
 
 // Function to calculate the DST start and end dates for Central Europe
-bool isDST(time_t currentTime) {
-
-  time_t dstStart, dstEnd;
-
+bool isDST(DateTime time) {
+   
+  #ifdef DEBUG_MODE
+    #ifdef ALWAYS_DST
+    time=DateTime((String(time.year())+"-04-01%00:00:00").c_str());
+    #endif
+    #ifdef NEVER_DST
+    time=DateTime((String(time.year())+"-11-01%00:00:00").c_str());
+    #endif
+  #endif
   // Calculate the last Sunday of March
-  tmElements_t startTm;
-  startTm.Year = year(currentTime) - 1970;
-  startTm.Month = 3;
-  startTm.Day = 31; // Start with the last day of March
-  startTm.Hour = 2; // 2 AM because the change happens at night
-  startTm.Minute = 0;
-  startTm.Second = 0;
-  time_t tempTime = makeTime(startTm);
-  while (weekday(tempTime) != 1) { // 1 represents Sunday
-    tempTime -= SECS_PER_DAY;
+  DateTime dstStart=DateTime((String(time.year())+"-03-31%02:00:00").c_str());
+  while (dstStart.dayOfTheWeek() != 1) { // 1 represents Sunday
+    dstStart =dstStart-TimeSpan(SECONDS_PER_DAY);
   }
-  dstStart = tempTime;
-
-  // Calculate the last Sunday of October
-  tmElements_t endTm;
-  endTm.Year = year(currentTime) - 1970;
-  endTm.Month = 10;
-  endTm.Day = 31; // Start with the last day of October
-  endTm.Hour = 3; // 3 AM because the change happens at night
-  endTm.Minute = 0;
-  endTm.Second = 0;
-  tempTime = makeTime(endTm);
-  while (weekday(tempTime) != 1) { // 1 represents Sunday
-    tempTime -= SECS_PER_DAY;
+    // Calculate the last Sunday of October
+  DateTime dstEnd=DateTime((String(time.year())+"-10-31%03:00:00").c_str());
+  while (dstEnd.dayOfTheWeek() != 1) { // 1 represents Sunday
+    dstEnd =dstEnd-TimeSpan(SECONDS_PER_DAY);
   }
-  dstEnd = tempTime;
-  //Serial.println(String(currentTime)+" "+String(dstStart)+" "+String(dstEnd));
-  return (currentTime >= dstStart && currentTime <= dstEnd);
+  return (time >= dstStart && time <= dstEnd);
 }
 
-void pulseDebugStringToDisplay(time_t EEpromTime, time_t RTMTime, int pulseDirection, bool generalEnable, bool isDST) {
-
-  /*
-  lcd.setCursor(0, 0);// set the cursor to column 0, line 1
-  lcd.print("                ");// Print a message to the LC
-  lcd.setCursor(0, 1);// set the cursor to column 0, line 1
-  lcd.print("                ");// Print a message to the LC
-*/
-
+void pulseDebugStringToDisplay(DateTime EEpromTime, DateTime RTCTime, int pulseDirection, bool generalEnable, bool isDST) {
   lcd.setCursor(0, 0);
-  String RTMTimeString=String(RTMTime % 3600);
-  for (int i=RTMTimeString.length();i<5;i++)
-  {
-    RTMTimeString=RTMTimeString+" ";
-  }
-  lcd.print("R:" + RTMTimeString);
-  lcd.setCursor(7, 0);
+
+  lcd.print("R:"+String(RTCTime.hour()>10?"":"0")+String(RTCTime.hour())+":"+(RTCTime.minute()>10?"":"0")+String(RTCTime.minute())+":"+(RTCTime.second()>10?"":"0")+String(RTCTime.second()));
+  lcd.setCursor(12, 0);
   lcd.print(String(pulseDirection == 0 ? "/" : (pulseDirection > 0 ? "+" : "-")) + " " + String(generalEnable ? "E" : "D"));
   lcd.setCursor(0, 1);
-  String EEpromTimeString=String(EEpromTime % 3600);
-  for (int i=EEpromTimeString.length();i<5;i++)
-  {
-    EEpromTimeString=EEpromTimeString+" ";
-  }
-  lcd.print("E:" + EEpromTimeString);
-  lcd.setCursor(7, 1);
+  lcd.print("E:"+String(EEpromTime.hour()>10?"":"0")+String(EEpromTime.hour())+":"+(EEpromTime.minute()>10?"":"0")+String(EEpromTime.minute())+":"+(EEpromTime.second()>10?"":"0")+String(EEpromTime.second()));
+  lcd.setCursor(12, 1);
   lcd.print(isDST ? "DST" : "STD");
 }
 
-//mock
-time_t getRTMTime() {
-  return SECONDSOFFSET + (millis() / 1000);
+
+DateTime getRTCTime() {
+  //return SECONDSOFFSET + (millis() / 1000);
+  #ifdef DEBUG_MODE
+   if (!rtc.begin()) {
+    return DateTime((uint32_t)0);
+  }
+  #endif
+  return rtc.now();
+
 }
 
-time_t getEEpromTime() {
+DateTime getEEpromTime() {
   return mockEEpromTime;
 }
 
-int setEEpromTime(time_t secs) {
-  mockEEpromTime = secs;
+int setEEpromTime(DateTime time) {
+  mockEEpromTime = time;
   return 1;
 }
 
@@ -177,46 +175,55 @@ void sendPulse(int direction) {
   digitalWrite(motorPulseDownPin, LOW);
 }
 
-time_t dstAdjustedTime(time_t inputTime)
+DateTime dstAdjustedTime(DateTime time)
 {
-  return (isDST(inputTime)?inputTime+secsPerMinute*60:inputTime);
+  return (isDST(time)?time+TimeSpan(secsPerMinute*60):time);
 }
 
 void loop() {
 
-  //self reset every week, 
+  //self reset every week, just in case I f*cked up and some variable would overflow left unchecked
   if (millis() >= 604800000UL) { 
-    // Perform a software reset
     asm volatile ("  jmp 0"); 
   }
 
 
   bool generalEnable = digitalRead(generalEnablePin) == HIGH;
 
-  time_t RTMTime = getRTMTime();
+  
 
-  time_t EEpromTime = getEEpromTime();
-  time_t dstAdjRTMTime= dstAdjustedTime(RTMTime);
-  bool dst = isDST(RTMTime);
+
+  DateTime RTCTime = getRTCTime();
+
+
+
+
+   
+
+  DateTime EEpromTime = getEEpromTime();
+  DateTime dstAdjRTCTime= dstAdjustedTime(RTCTime);
+  bool dst = isDST(RTCTime);
   
  
+ 
   if (generalEnable) {
-     //Serial.println("RTM time="+String(RTMTime)+" DST Adjusted RTMTime="+ String(dstAdjRTMTime) + " EEpromTime=" + String(EEpromTime) + " diff:" + String((long)(dstAdjRTMTime - EEpromTime)) + " lastPulseTime=" + String(lastPulseTime) + " now=" + String(RTMTime) + " diff=" + String(RTMTime - lastPulseTime));
-    if (((long)(dstAdjRTMTime-EEpromTime)  > secsPerMinute) && ((RTMTime - lastPulseTime) > delayBetweenPulses)) {
+     //Serial.println("RTC time="+String(RTCTime)+" DST Adjusted RTCTime="+ String(dstAdjRTCTime) + " EEpromTime=" + String(EEpromTime) + " diff:" + String((long)(dstAdjRTCTime - EEpromTime)) + " lastPulseTime=" + String(lastPulseTime) + " now=" + String(RTCTime) + " diff=" + String(RTCTime - lastPulseTime));
+    //Serial.println(String((dstAdjRTCTime-EEpromTime).totalseconds()));
+    if (((dstAdjRTCTime-EEpromTime).totalseconds()  > secsPerMinute) && ((RTCTime - lastPulseTime).totalseconds() > secondsBetweenPulses)) {
       //shoot a pulse
       //TODO make this a pulse to a 555
-      Serial.println("Sending a pulse, RTM time="+String(RTMTime)+" DST Adjusted RTMTime=" + String(dstAdjRTMTime) + " EEpromTime=" + String(EEpromTime) + " diff:" + String((long)(dstAdjRTMTime - EEpromTime)) + " lastPulseTime=" + String(lastPulseTime) + " now=" + String(RTMTime) + " diff=" + String(RTMTime - lastPulseTime));
+      //Serial.println("Sending a pulse, RTC time="+String(RTCTime)+" DST Adjusted RTCTime=" + String(dstAdjRTCTime) + " EEpromTime=" + String(EEpromTime) + " diff:" + String((long)(dstAdjRTCTime - EEpromTime)) + " lastPulseTime=" + String(lastPulseTime) + " now=" + String(RTCTime) + " diff=" + String(RTCTime - lastPulseTime));
       int lastPulseDirection = getLastPulseDirection();
       sendPulse(lastPulseDirection);
       setLastPulseDirection(lastPulseDirection > 0 ? -1 : 1);
 
-      setEEpromTime(EEpromTime + secsPerMinute);
-      lastPulseTime = RTMTime;
+      setEEpromTime(EEpromTime + TimeSpan(secsPerMinute));
+      lastPulseTime = RTCTime;
 
     }
-    pulseDebugStringToDisplay(EEpromTime, RTMTime, lastPulseDirection, generalEnable, dst);
+    pulseDebugStringToDisplay(EEpromTime, RTCTime, lastPulseDirection, generalEnable, dst);
   } else {
-    pulseDebugStringToDisplay(EEpromTime, RTMTime, lastPulseDirection, generalEnable, dst);
+    pulseDebugStringToDisplay(EEpromTime, RTCTime, lastPulseDirection, generalEnable, dst);
   }
 
   // Check if the button is pressed
@@ -235,8 +242,8 @@ void loop() {
         delay(100);
       }
 
-      //sets the current Secs on the eeprom to the value coming from the RTM, considering DST 
-      setEEpromTime(floor(dstAdjustedTime(getRTMTime()) / secsPerMinute) * secsPerMinute);
+      //sets the current Secs on the eeprom to the value coming from the RTC, considering DST, setting seconds to zero
+      setEEpromTime(DateTime((floor(dstAdjustedTime(getRTCTime()).secondstime()) / secsPerMinute) * secsPerMinute));
 
       Serial.println("Messa in fase manuale");
       pressedTime = 0; // Reset the timer
@@ -254,10 +261,10 @@ void loop() {
       int lastPulseDirection = getLastPulseDirection();
       sendPulse(lastPulseDirection);
       setLastPulseDirection(lastPulseDirection > 0 ? -1 : 1);
-      setEEpromTime(EEpromTime + secsPerMinute);
+      setEEpromTime(EEpromTime + TimeSpan(secsPerMinute));
     }
   }
 
-  //for debug, run every second
-  //delay(100);
+
+
 }
