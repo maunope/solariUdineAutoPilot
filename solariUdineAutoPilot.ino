@@ -1,6 +1,6 @@
-#include <EEPROM.h>
 #include <LiquidCrystal_I2C.h>
 #include <RTClib.h>
+#include <SparkFun_External_EEPROM.h>
 
 
 //#define SECONDSOFFSET 1731283200 //11 Novembre 2024 00:00
@@ -15,9 +15,10 @@
 //#define FAST_DEBUG
 
 const unsigned long EEPROM_SIGNATURE = 0xD24F789F; 
-const int EEPROM_PAGE_SIZE_BYTES = 4;
+const int EEPROM_PAGE_SIZE_BYTES = 64;
 const int MAX_WRITE_PER_EEPROM_PAGE = 10080; //approx one week of regular operation
-const int EEPROM_SIZE_BYTES = 1024;
+const int EEPROM_SIZE_BYTES = 32768;
+const int EEPROM_TYPE = 256;
 
 //to avoid straining the clock, if time is more than 120 seconds off will remain still until the next day
 const int MAX_CATCHUP_MINUTES =  120; 
@@ -56,6 +57,7 @@ int pulseDurationMillis = 300;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 RTC_DS3231 rtc;
+ExternalEEPROM extEeprom;
 
 void setup() {
   #ifdef FAST_DEBUG
@@ -81,15 +83,24 @@ void setup() {
   lcd.backlight();
   lcd.clear();
 
-  //Under no circumnstance read/write the RTC module when not ready!
-  //if RTC is unavailabe sends a blink pattern and then resets
-  if (!rtc.begin()) {
+
+  if (!extEeprom.begin()) {
+    Serial.println("External eeprom Error");
+    blinkFeedbackLed(300, 300, 30);
+    //reset
+    asm volatile("  jmp 0");
+  }
+  extEeprom.setMemoryType(EEPROM_TYPE);
+
+  
+//Under no circumnstance read/write the RTC module when not ready!
+ //if RTC is unavailabe sends a blink pattern and then resets
+ if (!rtc.begin()) {
     Serial.println("RTC Error");
     blinkFeedbackLed(50, 300, 30);
     //reset
     asm volatile("  jmp 0");
   }
-
   //if the rtc module is new, sets time. this only makes sense when connected to a PC
   if (rtc.lostPower()) {
     Serial.println("Power lost, resetting time. (check battery maybe?");
@@ -121,7 +132,7 @@ int writeTimeDataToEeprom(EepromData & eepromData) {
   Serial.println(String(EEPROM_SIGNATURE, HEX) + " eepromIndexDescriptor.signature: " + String(eepromIndexDescriptor.signature, HEX) + " eepromIndexDescriptor.pageOffset: " + String(eepromIndexDescriptor.pageOffset));
 
   //check if first 4 bytes contain the required signature string
-  EEPROM.get(0, eepromIndexDescriptor);
+  extEeprom.get(0, eepromIndexDescriptor);
 
   Serial.println(String(EEPROM_SIGNATURE, HEX) + " eepromIndexDescriptor.signature: " + String(eepromIndexDescriptor.signature, HEX) + " eepromIndexDescriptor.pageOffset: " + String(eepromIndexDescriptor.pageOffset));
   //check if first 4 bytes contain the required signature string
@@ -134,18 +145,18 @@ int writeTimeDataToEeprom(EepromData & eepromData) {
     //set to the number of bytes containing the descriptor
     eepromIndexDescriptor.pageOffset = eepromIndexDescriptorSizeBytes;
 
-    EEPROM.put(0, eepromIndexDescriptor);
+    extEeprom.put(0, eepromIndexDescriptor);
 
     //write a blank time, setting to WINT_MAX ensures this dummy time will prevent unwanted pulses
     EepromData blankTimeData;
     blankTimeData.dateTime = WINT_MAX;
     blankTimeData.nextPulsePolarity = 0;
     blankTimeData.currentWrites = 0;
-    EEPROM.put(eepromIndexDescriptor.pageOffset, eepromIndexDescriptor);
+    extEeprom.put(eepromIndexDescriptor.pageOffset, eepromIndexDescriptor);
   }
 
   EepromData currentEepromData;
-  EEPROM.get(eepromIndexDescriptor.pageOffset, currentEepromData);
+  extEeprom.get(eepromIndexDescriptor.pageOffset, currentEepromData);
 
   //switch to next page if the number of writes on the current one exceeds the desided value
   if (currentEepromData.currentWrites > MAX_WRITE_PER_EEPROM_PAGE) {
@@ -153,7 +164,7 @@ int writeTimeDataToEeprom(EepromData & eepromData) {
     //switch forward one page, if we reached the top, start back from seconda page (first is index) 
     eepromIndexDescriptor.pageOffset = (eepromIndexDescriptor.pageOffset + eepromDataPagesSizeBytes < EEPROM_SIZE_BYTES) ? eepromIndexDescriptor.pageOffset + eepromDataPagesSizeBytes : eepromIndexDescriptorSizeBytes;
     eepromIndexDescriptor.signature = EEPROM_SIGNATURE;
-    EEPROM.put(0, eepromIndexDescriptor);
+    extEeprom.put(0, eepromIndexDescriptor);
     //reset writes counter in currentEepromData
     eepromData.currentWrites = 0;
     //Serial.println("New page offset: " + String(eepromIndexDescriptor.pageOffset));
@@ -162,7 +173,7 @@ int writeTimeDataToEeprom(EepromData & eepromData) {
     eepromData.currentWrites = eepromData.currentWrites + 1;
   }
 
-  EEPROM.put(eepromIndexDescriptor.pageOffset, eepromData);
+  extEeprom.put(eepromIndexDescriptor.pageOffset, eepromData);
 
   return 1;
 }
@@ -171,7 +182,7 @@ int writeTimeDataToEeprom(EepromData & eepromData) {
 int readEepromData(EepromData & eepromData) {
 
   EepromIndexDescriptor eepromIndexDescriptor;
-  EEPROM.get(0, eepromIndexDescriptor);
+  extEeprom.get(0, eepromIndexDescriptor);
 
   //check if first 4 bytes contain the required signature string
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
@@ -183,7 +194,7 @@ int readEepromData(EepromData & eepromData) {
   }
 
   EepromData timeDataFromEEprom;
-  EEPROM.get(eepromIndexDescriptor.pageOffset, eepromData);
+  extEeprom.get(eepromIndexDescriptor.pageOffset, eepromData);
   return 1; // Data read successfully
 
 }
