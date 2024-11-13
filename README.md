@@ -24,11 +24,9 @@ The software tries to mitigate strain on the flip clock limiting the number and 
 
 The following features improve durability and operation:
 - The system self restart once per week
-- EEProm writes are spread over a 256kbit eeprom, this should guarantee at least 20 years of operation before writes start to fail, more likley 50-70
+- Eeprom writes are spread over a 256kbit eeprom, this should guarantee at least 20 years of operation before writes start to fail, more likely 50-70
 - If eeprom stored time is unavailable, the clock halts until it is adjusted
 - If RTC module is unavailable, the clock blinks for 30 seconds and then resets
-
-
 
 ## Dependencies
 
