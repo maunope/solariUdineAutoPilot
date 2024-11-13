@@ -1,5 +1,5 @@
-#include <LiquidCrystal_I2C.h>
-#include <RTClib.h>
+#include <LiquidCrystal_I2C.h> //https://github.com/johnrickman/LiquidCrystal_I2C
+#include <RTClib.h> //https://github.com/adafruit/RTClib
 #include <SparkFun_External_EEPROM.h>
 
 
@@ -19,6 +19,9 @@ const int EEPROM_PAGE_SIZE_BYTES = 64;
 const int MAX_WRITE_PER_EEPROM_PAGE = 10080; //approx one week of regular operation
 const int EEPROM_SIZE_BYTES = 32768;
 const int EEPROM_TYPE = 256;
+const int EEPROM_ADDRESS_BYTES = 2;
+
+
 
 //to avoid straining the clock, if time is more than 120 seconds off will remain still until the next day
 const int MAX_CATCHUP_MINUTES =  120; 
@@ -91,6 +94,10 @@ void setup() {
     asm volatile("  jmp 0");
   }
   extEeprom.setMemoryType(EEPROM_TYPE);
+
+  extEeprom.setMemorySizeBytes(EEPROM_SIZE_BYTES);
+  extEeprom.setAddressBytes(EEPROM_ADDRESS_BYTES); // Set address bytes and page size after MemorySizeBytes()
+  extEeprom.setPageSizeBytes(EEPROM_PAGE_SIZE_BYTES);
 
   
 //Under no circumnstance read/write the RTC module when not ready!
