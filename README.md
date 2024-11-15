@@ -82,6 +82,10 @@ The controller will now keep the flip clock display aligned with the internal RT
 
 <img src="displaycodes.png" width="640px" alt="Optional display fields">
 
+**Q:**  How can I tell if my eeprom is corrupted or simply requires initialization?
+
+**A:**  "Adj. time" on the display or "No valid time set in eeprom, please adjust clock" on the Serial are good news.
+
 **Q:**(some random problem not covered here)
 
 **A:** Hook up a serial cable, some debug info is sent through 
