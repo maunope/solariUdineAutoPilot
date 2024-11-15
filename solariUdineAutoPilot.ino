@@ -133,6 +133,8 @@ void blinkFeedbackLed(int onMillis, int offMillis, int iterations) {
 // maximize the eeprom life if the eeprom has no record of the current page, a
 // new index page is created and writes restart from the first available page
 int writeTimeDataToEeprom(EepromData & eepromData) {
+
+
   const int eepromDataPagesSizeBytes =
     ceil(sizeof(EepromData) / (float) EEPROM_PAGE_SIZE_BYTES) *
     EEPROM_PAGE_SIZE_BYTES;
@@ -147,20 +149,16 @@ int writeTimeDataToEeprom(EepromData & eepromData) {
   EepromIndexDescriptor eepromIndexDescriptor;
   eepromIndexDescriptor.signature = 0;
 
-  Serial.println(String(EEPROM_SIGNATURE, HEX) +
-    " eepromIndexDescriptor.signature: " +
-    String(eepromIndexDescriptor.signature, HEX) +
-    " eepromIndexDescriptor.pageOffset: " +
-    String(eepromIndexDescriptor.pageOffset));
+
 
   // check if first 4 bytes contain the required signature string
   extEeprom.get(0, eepromIndexDescriptor);
 
-  Serial.println(String(EEPROM_SIGNATURE, HEX) +
+/*  Serial.println(String(EEPROM_SIGNATURE, HEX) +
     " eepromIndexDescriptor.signature: " +
     String(eepromIndexDescriptor.signature, HEX) +
     " eepromIndexDescriptor.pageOffset: " +
-    String(eepromIndexDescriptor.pageOffset));
+    String(eepromIndexDescriptor.pageOffset));*/
   // check if first 4 bytes contain the required signature string
 
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
@@ -212,6 +210,7 @@ int writeTimeDataToEeprom(EepromData & eepromData) {
     eepromData.currentWrites = eepromData.currentWrites + 1;
   }
 
+
   extEeprom.put(eepromIndexDescriptor.pageOffset, eepromData);
 
   return 1;
@@ -227,7 +226,8 @@ int readEepromData(EepromData & eepromData) {
 
   // check if first 4 bytes contain the required signature string
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
-    Serial.println("EEprom is not initialized");
+
+    Serial.println("EEprom is not initialized: got "+String(eepromIndexDescriptor.signature,HEX)+" instead of "+String(EEPROM_SIGNATURE,HEX));
     // EEPROM is not initialized, return 0
     eepromData.dateTime = WINT_MAX;
     eepromData.nextPulsePolarity = 0;
@@ -348,6 +348,9 @@ void loop() {
     asm volatile("  jmp 0");
   }
 
+
+
+
   bool motorPulseEnable = digitalRead(motorPulseEnablePin) == HIGH;
 
   // RTCDateTime is the time coming from the battery backed Real Time Clock module, always in standard time
@@ -366,10 +369,13 @@ void loop() {
   if (!eepromData.dateTime.isValid()) {
     lcd.setCursor(0, 0);
     lcd.print("Adj. time");
-    Serial.println("No valid time set in eeprom, please adjust clock");
+    Serial.println("No valid time set in eeprom, please perform manual adjustment");
     blinkFeedbackLed(300, 50, 5);
   } else {
     // regular operation
+
+
+
 
     // if the motor enable signal is turned off, don't calculate/send pulses
     if (motorPulseEnable) {
@@ -397,7 +403,7 @@ void loop() {
       if (((rtcEepromTimeDiffSeconds > secsPerMinute) && ((RTCDateTime - lastPulseTime).totalseconds() > secsBetweenPulses))) {
         if (rtcEepromTimeDiffSeconds / secsPerMinute >= MAX_CATCHUP_MINUTES) {
           Serial.println("More than " + String(MAX_CATCHUP_MINUTES) + " minutes to catch up, pausing till next day");
-          eepromData.dateTime = eepromData.dateTime + TimeSpan(SECONDS_PER_DAY);
+          //eepromData.dateTime = eepromData.dateTime + TimeSpan(SECONDS_PER_DAY);
           eepromData.pausedTillNextDay = true;
           writeTimeDataToEeprom(eepromData);
         } else {
