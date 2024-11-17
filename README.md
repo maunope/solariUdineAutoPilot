@@ -27,6 +27,7 @@ The following features improve durability and operation:
 - Eeprom writes are spread over a 256kbit eeprom, this should guarantee at least 20 years of operation before writes start to fail, more likely 50-70
 - If eeprom stored time is unavailable, the clock halts until it is adjusted
 - If RTC module is unavailable, the clock blinks for 30 seconds and then resets
+- the circuit board has hardware protection avoiding prolonged motor pulses, set to 1 second. Once a pulse is sent, following ones are delayed until the hw protection has completed its cycle. Note that is totally possible to build the board without the 555 timer, just hardwire L293D enable pins to high, software will work just fine.
 
 ## Dependencies
 
