@@ -35,12 +35,14 @@ const int motorPulseUpPin = 7;
 const int motorPulseDownPin = 8;
 const int pushButtonPin = 9;
 const int feedbackLedPin = 4;
+const int waitNextPulseCyclePin = 14;
 
 const int secsPerMinute = 60;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 RTC_DS3231 rtc;
 ExternalEEPROM extEeprom;
+
 
 // to avoid straining the clock, if time is more than 120 seconds off will
 // remain still until the next day
@@ -51,6 +53,14 @@ const int MAX_CATCHUP_MINUTES = 120;
 bool pausedTillNextDay = false;
 // tracks last pulse sent to motor, to enforce max pace set by secsBetweenPulses
 DateTime lastPulseTime = DateTime((uint32_t) 0);
+
+long lastPulseTimeMillis = 0;
+//these two are true when a pulse was delayed to way until the hardware pulse time protection has cycled
+bool bookedPulseManual = false;
+bool bookedPulseAuto = false;
+
+//unsigned long lastBlinkMillis=0;
+
 // minimun delay between pulses, overridden by manual advances. real Solari
 // Udine controllers use 4s
 int secsBetweenPulses = 3;
@@ -74,12 +84,14 @@ void setup() {
   pinMode(motorPulseDownPin, OUTPUT);
   pinMode(feedbackLedPin, OUTPUT);
   pinMode(pushButtonPin, INPUT);
+  pinMode(waitNextPulseCyclePin, INPUT);
   digitalWrite(motorPulseUpPin, LOW);
   digitalWrite(motorPulseDownPin, LOW);
   digitalWrite(feedbackLedPin, LOW);
 
   // Init Serial and i2c modules
   Serial.begin(9600);
+  //btSerial.begin(9600);
 
   lcd.init();
   lcd.backlight();
@@ -117,23 +129,65 @@ void setup() {
   }
 }
 
+/*
+int interval=0;
+int wantedState=0;
+int runsLeft=0;
+int lastState=0;
+int onInterval=0;
+int offInterval=0;
+*/
+
 // blinks the feedback led alternating given on/off time, for the given number
 // of times.
 void blinkFeedbackLed(int onMillis, int offMillis, int iterations) {
-  for (int i = 0; i < iterations; i++) {
+ for (int i = 0; i < iterations; i++) {
     digitalWrite(feedbackLedPin, HIGH);
     delay(onMillis);
     digitalWrite(feedbackLedPin, LOW);
     delay(offMillis);
   }
   digitalWrite(feedbackLedPin, LOW);
+ /* onInterval=onMillis;
+  offInterval=offMillis;
+  runsLeft=iterations;*/
 }
+
+
+/*
+// blinks the feedback led alternating given on/off time, for the given number
+// of times.
+void executeBlink() {
+  unsigned long currentMillis = millis();
+    if(runsLeft>0)
+    {
+    if (currentMillis - lastBlinkMillis >= interval) {
+      lastBlinkMillis = currentMillis;
+      if (lastState ==0) {
+            digitalWrite(feedbackLedPin, HIGH);
+            lastState=1;
+            interval=onInterval;
+      } else {
+            digitalWrite(feedbackLedPin, LOW);
+            lastState=0;
+             interval=offInterval;
+            runsLeft--;
+      }
+    }
+    }
+    else
+    {
+      digitalWrite(feedbackLedPin, LOW);
+      lastState=0;
+    }
+
+}
+*/
 
 // writes EepromData struct to the eeprom, spreading writes over pages to
 // maximize the eeprom life if the eeprom has no record of the current page, a
 // new index page is created and writes restart from the first available page
 int writeTimeDataToEeprom(EepromData & eepromData) {
-
 
   const int eepromDataPagesSizeBytes =
     ceil(sizeof(EepromData) / (float) EEPROM_PAGE_SIZE_BYTES) *
@@ -149,16 +203,14 @@ int writeTimeDataToEeprom(EepromData & eepromData) {
   EepromIndexDescriptor eepromIndexDescriptor;
   eepromIndexDescriptor.signature = 0;
 
-
-
   // check if first 4 bytes contain the required signature string
   extEeprom.get(0, eepromIndexDescriptor);
 
-/*  Serial.println(String(EEPROM_SIGNATURE, HEX) +
-    " eepromIndexDescriptor.signature: " +
-    String(eepromIndexDescriptor.signature, HEX) +
-    " eepromIndexDescriptor.pageOffset: " +
-    String(eepromIndexDescriptor.pageOffset));*/
+  /*  Serial.println(String(EEPROM_SIGNATURE, HEX) +
+      " eepromIndexDescriptor.signature: " +
+      String(eepromIndexDescriptor.signature, HEX) +
+      " eepromIndexDescriptor.pageOffset: " +
+      String(eepromIndexDescriptor.pageOffset));*/
   // check if first 4 bytes contain the required signature string
 
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
@@ -210,7 +262,6 @@ int writeTimeDataToEeprom(EepromData & eepromData) {
     eepromData.currentWrites = eepromData.currentWrites + 1;
   }
 
-
   extEeprom.put(eepromIndexDescriptor.pageOffset, eepromData);
 
   return 1;
@@ -227,7 +278,7 @@ int readEepromData(EepromData & eepromData) {
   // check if first 4 bytes contain the required signature string
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
 
-    Serial.println("EEprom is not initialized: got "+String(eepromIndexDescriptor.signature,HEX)+" instead of "+String(EEPROM_SIGNATURE,HEX));
+    Serial.println("EEprom is not initialized: got " + String(eepromIndexDescriptor.signature, HEX) + " instead of " + String(EEPROM_SIGNATURE, HEX));
     // EEPROM is not initialized, return 0
     eepromData.dateTime = WINT_MAX;
     eepromData.nextPulsePolarity = 0;
@@ -342,14 +393,12 @@ void pulseDebugStringToDisplay(EepromData eepromData, DateTime RTCDateTime,
 // and advance if needed
 // - handle push button input
 void loop() {
+
   // self reset every week, just in case I f*cked up and some variable would
   // overflow left unchecked
   if (millis() >= 604800000UL) {
     asm volatile("  jmp 0");
   }
-
-
-
 
   bool motorPulseEnable = digitalRead(motorPulseEnablePin) == HIGH;
 
@@ -374,9 +423,6 @@ void loop() {
   } else {
     // regular operation
 
-
-
-
     // if the motor enable signal is turned off, don't calculate/send pulses
     if (motorPulseEnable) {
       // if the clock has been sleping for days, skip them until it's <24hours
@@ -398,24 +444,33 @@ void loop() {
       // if actual time is more than one minute ahead of what has been already
       // pulsed to the motor, shoot one pulse pace pulses every
       // secsBetweenPulses seconds to avoid straining the flip clock
+
+      //bookedPulse means a pulse (manual or automatd) has to be dealyed because hardware protection cycle hadn't finished
+      //ther
       long rtcEepromTimeDiffSeconds =
         (dstAdjRTCDateTime - eepromData.dateTime).totalseconds();
-      if (((rtcEepromTimeDiffSeconds > secsPerMinute) && ((RTCDateTime - lastPulseTime).totalseconds() > secsBetweenPulses))) {
-        if (rtcEepromTimeDiffSeconds / secsPerMinute >= MAX_CATCHUP_MINUTES) {
+      if (((rtcEepromTimeDiffSeconds > secsPerMinute) && ((RTCDateTime - lastPulseTime).totalseconds() > secsBetweenPulses)) || bookedPulseAuto) {
+        if ((rtcEepromTimeDiffSeconds / secsPerMinute >= MAX_CATCHUP_MINUTES) && !bookedPulseAuto) {
           Serial.println("More than " + String(MAX_CATCHUP_MINUTES) + " minutes to catch up, pausing till next day");
           //eepromData.dateTime = eepromData.dateTime + TimeSpan(SECONDS_PER_DAY);
           eepromData.pausedTillNextDay = true;
           writeTimeDataToEeprom(eepromData);
         } else {
           // shoot a pulse
-          // TODO make this a pulse to a 555
-          sendPulse(eepromData, pulseDurationMillis);
-          // record the last pulsed time, advance by one minute
-          eepromData.dateTime = eepromData.dateTime + TimeSpan(secsPerMinute);
-          eepromData.pausedTillNextDay = false;
-          writeTimeDataToEeprom(eepromData);
 
-          lastPulseTime = RTCDateTime;
+          if (digitalRead(waitNextPulseCyclePin) == LOW) {
+            sendPulse(eepromData, pulseDurationMillis);
+            // record the last pulsed time, advance by one minute
+            eepromData.dateTime = eepromData.dateTime + TimeSpan(secsPerMinute);
+            eepromData.pausedTillNextDay = false;
+            writeTimeDataToEeprom(eepromData);
+            lastPulseTime = RTCDateTime;
+            bookedPulseAuto = false;
+          } else {
+            Serial.println("Delaying synchronization pulse");
+            bookedPulseAuto = true;
+          }
+
         }
       }
       if (eepromData.pausedTillNextDay) {
@@ -434,8 +489,10 @@ void loop() {
     if (pushButtonPressedMillis == 0) {
       pushButtonPressedMillis = millis();
     }
-    // long prss
+    // long press
     else if (millis() - pushButtonPressedMillis >= 3000) {
+
+
       // this totals to 1 second
       blinkFeedbackLed(100, 100, 5);
       // sets the current Secs on the eeprom to the value coming from the RTC,
@@ -444,16 +501,25 @@ void loop() {
       eepromData.pausedTillNextDay = false;
       writeTimeDataToEeprom(eepromData);
       Serial.println("Manual Adjustment completed");
-      pushButtonPressedMillis = 0;
+      pushButtonPressedMillis=0;
     }
   }
   // short press
-  else if (pushButtonPressedMillis > 0) {
+  else if (pushButtonPressedMillis > 0 || bookedPulseManual) {
+    Serial.println("Manual pulse requested");
     pushButtonPressedMillis = 0;
-    blinkFeedbackLed(100, 0, 1);
-    sendPulse(eepromData, pulseDurationMillis);
-    eepromData.dateTime = eepromData.dateTime + TimeSpan(secsPerMinute);
-    writeTimeDataToEeprom(eepromData);
-    Serial.println("Sent a manual pulse");
+    if (digitalRead(waitNextPulseCyclePin) == LOW) {
+      lastPulseTimeMillis = millis();
+      blinkFeedbackLed(100, 0, 1);
+      sendPulse(eepromData, pulseDurationMillis);
+      eepromData.dateTime = eepromData.dateTime + TimeSpan(secsPerMinute);
+      writeTimeDataToEeprom(eepromData);
+      Serial.println("Sent a manual pulse " + String((bookedPulseManual ? "booked" : "")));
+      bookedPulseManual = false;
+    } else {
+      Serial.println("Delaying manual pulse");
+      bookedPulseManual = true;
+    }
+
   }
 }
