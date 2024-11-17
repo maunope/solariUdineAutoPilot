@@ -95,3 +95,4 @@ The controller will now keep the flip clock display aligned with the internal RT
 ## Todo
 - Add support for bluetooth communication
 - Update/correct Tinkercad design
+- Upload kicad design
