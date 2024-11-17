@@ -36,9 +36,10 @@ The following features improve durability and operation:
 - [SparkFun External EEPROM Arduino Library](https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library)
 
 ## Circuit Board
-**to be updated**
 
-[Tinkercad design](https://www.tinkercad.com/things/edBA37nszuH-solari-udine-autopilot?sharecode=Utxk19oz_5hmAhspum-ylxp-65AgX1UbVL5bwIXLegg)
+
+**WORK IN PROGRESS** check the schematic in this repo, board design is still wip
+
 
 <img src="controllersolari.png" width="640px" alt="Solari Udine Autopilot Circuit Board">
 
