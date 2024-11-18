@@ -2,38 +2,46 @@
 
 
 # Disclaimer
-This is still a prototype, still to be tested on a real clock, use at your risk and plz **don't come whining if you damage your flip clock or set your house on fire.**
-
+This is still a prototype, not yet tested on a real clock, use at your risk and plz **don't come whining if you damage your flip clock or set your house on fire.**
 
 
 # Solari Udine Auto Pilot
 
-Arduino based Solari Udine Clock controller, suitable for alternating pulse Solari Udine Clock motors (i.e. Cifra 12). Controls hours and minutes, not calendar functions are provided.
+
+Arduino based Solari Udine Clock controller, suitable for alternating pulse Solari Udine Clock motors (i.e. Cifra 12). Controls hours and minutes, no calendar functions are provided.
+
 
 **Main features:**
 - Self adjusts after a power loss
 - Handles DST (Central Europe rules)
 - Allows manual adjustment
 
-A led provides visual feedback, an optional LCD1602 cab be plugged in to display status. 
+
+A led provides visual feedback, an optional LCD1602 can be plugged in to display status.
+
 
 The software tries to mitigate strain on the flip clock limiting the number and frequency of rollers turns:
 - Turns are limited to 1 every 3 seconds (manual step adjustment bypasses this)
-- If more than 120 roller flips would be required to catch up, movement is paused till the next day (a halted clock displays the right time once a day after all **:-)**)
+- If the clock is more than 120 minutes behind, movement is paused till the next day (a halted clock displays the right time once a day after all **:-)**)
 - If the eeprom or rtc module fail, no pulses are sent to the motor
+- A hardware circuit limits pulse duration and frequency to 1 second.
+- the circuit board has hardware protection avoiding prolonged motor pulses, set to 1 second. Once a pulse is sent, following ones are delayed until the hw protection has completed its cycle. Note that it is totally possible to build the board without the 555 timer, just hardwire L293D enable pins to high, software will work just fine.
 
 The following features improve durability and operation:
 - The system self restart once per week
 - Eeprom writes are spread over a 256kbit eeprom, this should guarantee at least 20 years of operation before writes start to fail, more likely 50-70
 - If eeprom stored time is unavailable, the clock halts until it is adjusted
 - If RTC module is unavailable, the clock blinks for 30 seconds and then resets
-- the circuit board has hardware protection avoiding prolonged motor pulses, set to 1 second. Once a pulse is sent, following ones are delayed until the hw protection has completed its cycle. Note that is totally possible to build the board without the 555 timer, just hardwire L293D enable pins to high, software will work just fine.
+
 
 ## Dependencies
 
+
 - [LiquidCrustal I2C](https://github.com/johnrickman/LiquidCrystal_I2C)
 - [RTClib](https://github.com/adafruit/RTClib)
+- [Regexp](https://github.com/nickgammon/Regexp)
 - [SparkFun External EEPROM Arduino Library](https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library)
+
 
 ## Circuit Board
 
@@ -43,23 +51,27 @@ The following features improve durability and operation:
 
 <img src="controllersolari.png" width="640px" alt="Solari Udine Autopilot Circuit Board">
 
+
 **How to read led signals**
+
 
 Either for good or bad news, green led will flash. red will stay on when general enable switch is on
 
+
 <img src="feedbackledpulses.png" width="640px" alt="Feedback led pulses interpretation card">
+
 
 ## How to install and adjust
 
+
 **First things first, let's not fry stuff**
 - If you built the board yourself, power it on while hooked up to Arduino IDE at least once to prime the RTC module
-- Check your clock coil working voltage, most accept 24V plus 12V or 48V with different wiring. **The current board design assumes both the coil and the arduino can be powered with 12V**
+- Check your clock coil working voltage. Most accept 24V plus 12V or 48V with different wiring. **The current board design assumes both the coil and the arduino can be powered with 12V**
 - Check your coil max current draw, one L293D with paralleled channels can drive up to 1200mA, no Solari Udine clock should draw more than that
-- Unplug the clock, wire your 12V power supply and the clock motor coil 
+- Unplug the clock, wire your 12V power supply and the clock motor coil
 - Turn the enable switch *OFF*
 - Power the board
-  
-**No smoke? good.**
+ **No smoke? good.**
 - On the first start, a manual time adjust is required,  "Time Adjustment Required" pattern will flash on the feedback led
 - Manually adjust the clock flip rolls to match current time, the optional LCD display displays it on the first line
 - Dial at least one minute advance with the button, this will prime pulse direction
@@ -67,33 +79,65 @@ Either for good or bad news, green led will flash. red will stay on when general
 - Turn the enable switch *ON*
 
 
-The controller will now keep the flip clock display aligned with the internal RTC clock. 
+The controller will now keep the flip clock display aligned with the internal RTC clock.
+
+## Serial port commands
+
+Commands format: **(<<|>>)[A-Z]{1,10}[a-z,A-Z,0-9]{1,20}**
+
+- **<<** to get something, **>>** to set
+- command name, in caps
+- (where applicable) parameter
+
+One command per line, max 32 chars long. the parser is pretty crude, pls stick to tested commands ;-) 
+
+**Available commands**:
+
+- **>>DATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time
+- **>>DATETIMEFROMSERIAL** align RTC date and time to the current PC system clock
+- **<<RTCDATETIME** print RTC date and time
+- **<<EEPROMDATA** print eeprom date, time and clock status information
 
 ## Troubleshooting
 **Q:** Instead of catching up the clock is standing still and the "Paused until next day" pattern flashes:
 
-**A:** When more than 120 minutes are to be catched up, it will pause and wait for RTC module time to realing on the next day to avoid straining the flip clock. 
+
+**A:** When more than 120 minutes are to be catched up, automatic adjustment will pause and wait for clock time to be right again the next day.
+
 
 **Q:** The arduino keeps resetting every half a minute or so, the feedback led flashes
 
+
 **A:**  Either the eeprom or RTC clock aren't responding, the board needs fixing
+
 
 **Q:**  I've hooked up a display, now what?
 
-**A:** 
+
+**A:**
+
 
 <img src="displaycodes.png" width="640px" alt="Optional display fields">
 
+
 **Q:**  How can I tell if my eeprom is corrupted or simply requires initialization?
+
 
 **A:**  "Adj. time" on the display or "No valid time set in eeprom, please adjust clock" on the Serial are good news.
 
+
 **Q:**(some random problem not covered here)
 
-**A:** Hook up a serial cable, some debug info is sent through 
+
+**A:** Hook up a serial cable, some debug info is sent through
+
 
 
 ## Todo
 - Add support for bluetooth communication
 - Update/correct Tinkercad design
 - Upload kicad design
+
+
+
+
