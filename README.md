@@ -122,14 +122,17 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **Q:**  How can I tell if my eeprom is corrupted or simply requires initialization?
 
-
 **A:**  "Adj. time" on the display or "No valid time set in eeprom, please adjust clock" on the Serial are good news.
 
 
-**Q:**(some random problem not covered here)
+**Q:** My RTC module lost its time configuration!
+
+**A:** >>DATETIME command should fix it, however, it could happen again, the module batttery might be drained
 
 
-**A:** Hook up a serial cable, some debug info is sent through
+**Q:** I can't tell what's going on with eeprom data
+
+**A:** >>EEPROMDATA command can extracts all the info saved on the eeprom
 
 
 
