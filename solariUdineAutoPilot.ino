@@ -4,8 +4,6 @@
 #include <SparkFun_External_EEPROM.h>  //https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library
 
 // #define DEBUG_MODE
-// #define ALWAYS_DST
-// #define NEVER_DST
 // #define FAST_DEBUG
 
 const unsigned long EEPROM_SIGNATURE = 0xD24F789F;
@@ -15,7 +13,7 @@ const int EEPROM_SIZE_BYTES = 32768;
 const int EEPROM_TYPE = 256;
 const int EEPROM_ADDRESS_BYTES = 2;
 
-// struct for the EEProm index page
+//struct for the EEProm index page
 struct EepromIndexDescriptor {
   unsigned long signature;
   int pageOffset = 0;
@@ -23,23 +21,29 @@ struct EepromIndexDescriptor {
 
 // struct for clock status to be saved to the eeprom
 struct EepromData {
+  //initializing at WINT_MAX ensures that if the conrtoller is run without further initialization 
+  //it won't send pulses
   DateTime dateTime = DateTime(WINT_MAX);
   int nextPulsePolarity = 0;
   int currentWrites = 0;
   bool pausedTillNextDay = false;
 };
 
+
+const int pushButtonPin = 1;
+const int waitNextPulseCyclePin = 2;
 const int motorPulseEnablePin = 6;
-const int motorPulseUpPin = 7;
-const int motorPulseDownPin = 8;
-const int pushButtonPin = 9;
-const int feedbackLedPin = 4;
-const int waitNextPulseCyclePin = 14;
+const int feedbackLedPin = 7;
+const int motorPulseUpPin = 8;
+const int motorPulseDownPin = 9;
 
 const int secsPerMinute = 60;
 
+//Optional LCD Display
 LiquidCrystal_I2C lcd(0x27, 16, 2);
+//Real Time Clock Module
 RTC_DS3231 rtc;
+//External eeprom to save current clock status
 ExternalEEPROM extEeprom;
 
 // to avoid straining the clock, if time is more than 120 seconds off will
@@ -51,8 +55,8 @@ const int MAX_CATCHUP_MINUTES = 120;
 bool pausedTillNextDay = false;
 // tracks last pulse sent to motor, to enforce max pace set by secsBetweenPulses
 DateTime lastPulseTime = DateTime((uint32_t)0);
+ 
 
-long lastPulseTimeMillis = 0;
 // these two are true when a pulse was delayed to way until the hardware pulse
 // time protection has cycled
 bool bookedPulseManual = false;
@@ -92,6 +96,7 @@ void setup() {
   Serial.begin(9600);
   // btSerial.begin(9600);
 
+
   lcd.init();
   lcd.backlight();
   lcd.clear();
@@ -119,11 +124,11 @@ void setup() {
     // reset
     asm volatile("  jmp 0");
   }
-  // if the rtc module is new, sets time. this only makes sense when connected
-  // to a PC,  standard time is always used, DST compensation is applied at
-  // runtime time zone is not relevant
-  if (rtc.lostPower()) {
+  // if the rtc module is new, sets time to Sketch compile time. this only makes sense when running from Arduino IDE
+  // Compile time is DST compensated (at least on macosx), converting back to standard time as we use only that in the RTC
+  if (rtc.lostPower() ) {
     Serial.println("Power lost, resetting time. (check battery maybe?");
+    //compile time 
     rtc.adjust(getStandardTime(DateTime(F(__DATE__), F(__TIME__))));
   }
 }
@@ -283,24 +288,18 @@ int readEepromData(EepromData& eepromData) {
 
 // returns true if give DateTime is DST, applies Central Europe rules
 bool isDST(DateTime time) {
-#ifdef DEBUG_MODE
-#ifdef ALWAYS_DST
-  time = DateTime((String(time.year()) + "-04-01%00:00:00").c_str());
-#endif
-#ifdef NEVER_DST
-  time = DateTime((String(time.year()) + "-11-01%00:00:00").c_str());
-#endif
-#endif
   // Calculate the last Sunday of March
   DateTime dstStart = DateTime((String(time.year()) + "-03-31%02:00:00").c_str());
-  while (dstStart.dayOfTheWeek() != 1) {  // 1 represents Sunday
+  //Serial.println(String("abba ")+String(dstStart.dayOfTheWeek()));
+  while (dstStart.dayOfTheWeek() != 0) {  // 1 represents Sunday
     dstStart = dstStart - TimeSpan(SECONDS_PER_DAY);
   }
   // Calculate the last Sunday of October
-  DateTime dstEnd = DateTime((String(time.year()) + "-10-31%03:00:00").c_str());
-  while (dstEnd.dayOfTheWeek() != 1) {  // 1 represents Sunday
+  DateTime dstEnd = DateTime((String(time.year()) + "-10-31%02:00:00").c_str());
+  while (dstEnd.dayOfTheWeek() != 0) {  // 1 represents Sunday
     dstEnd = dstEnd - TimeSpan(SECONDS_PER_DAY);
   }
+  //Serial.println("idstmethod time: "+time.timestamp()+" dststart: "+dstStart.timestamp()+" dstEnd: "+dstEnd.timestamp() +" isDST: "+String((time >= dstStart && time <= dstEnd)));
   return (time >= dstStart && time <= dstEnd);
 }
 
@@ -351,16 +350,15 @@ void sendPulse(EepromData& eepromData, int pulseDurationMillis) {
 
 // displays debug info on LCD, does not compensate DST, send compensated
 // DateTime
-void pulseDebugStringToDisplay(EepromData eepromData, DateTime RTCDateTime,
-                               bool motorPulseEnable, bool isDST) {
+void pulseDebugStringToDisplay(EepromData eepromData, DateTime dstAdjDateTime, bool motorPulseEnable, bool isDST) {
+  String dstAdjDateTimeString=dstAdjDateTime.timestamp();
   lcd.setCursor(0, 0);
-  lcd.print("R:" + String(RTCDateTime.hour() < 10 ? "0" : "") +String(RTCDateTime.hour()) + ":" +(RTCDateTime.minute() < 10 ? "0" : "")+
-  String(RTCDateTime.minute()) + ":" + (RTCDateTime.second() < 10 ? "0" : "") + String(RTCDateTime.second()) + " ");
+  lcd.print("R:"+dstAdjDateTimeString.substring(dstAdjDateTimeString.indexOf("T")+1));
   lcd.setCursor(12, 0);
   lcd.print(String(eepromData.nextPulsePolarity == 0 ? "/" : (eepromData.nextPulsePolarity > 0 ? "+" : "-")) +  " " + String(motorPulseEnable ? "E" : "D"));
   lcd.setCursor(0, 1);
-  lcd.print("E:" + String(eepromData.dateTime.hour() < 10 ? "0" : "") + String(eepromData.dateTime.hour()) + ":" +(eepromData.dateTime.minute() < 10 ? "0" : "") +
-  String(eepromData.dateTime.minute()) + ":" + (eepromData.dateTime.second() < 10 ? "0" : "") +String(eepromData.dateTime.second()) + " ");
+  String eepromDateTimeString=eepromData.dateTime.timestamp();
+  lcd.print("E:"+eepromDateTimeString.substring(eepromDateTimeString.indexOf("T")+1));
   lcd.setCursor(12, 1);
   lcd.print(isDST ? "D" : "W");
   lcd.setCursor(14, 1);
@@ -381,53 +379,34 @@ void parseSerialCommands(String command) {
     int minute = command.substring(20, 22).toInt();
     int second = command.substring(22, 24).toInt();
     DateTime manualDateTime = DateTime(year, month, day, hour, minute, second);
+
     //if you're dialing in serial comments, likely somehtign went wrong, checking RTC is answering just in case
     if (rtc.begin()) {
-      rtc.adjust(getStandardTime(manualDateTime));
+      rtc.adjust(manualDateTime);
       Serial.println("RTC module time adjusted");
     } else {
       Serial.println("Unable to set time, RTC not available");
     }
-  } else if (command.equals(">>DATETIMEFROMSERIAL")) {
+  } else if (command.equals(">>COMPILEDATETIME")) {
     if (rtc.begin()) {
       rtc.adjust(getStandardTime(DateTime(F(__DATE__), F(__TIME__))));
-      Serial.println("RTC module time adjusted");
+      Serial.println("RTC module time adjusted to sketch compile date time: (not DST compensated) "+getRTCDateTime().timestamp());
     } else {
       Serial.println("Unable to set time, RTC not available");
     }
   } else if (command.equals("<<RTCDATETIME")) {
     if (rtc.begin()) {
       DateTime RTCDateTime = getRTCDateTime();
-      Serial.println((
-      String(RTCDateTime.year())
-      +String(RTCDateTime.month() < 10 ? "-0" : "-")
-      +String(RTCDateTime.month())
-      +String(RTCDateTime.day() < 10 ? "-0" : "-") 
-      +String(RTCDateTime.day())
-      +String(RTCDateTime.hour() < 10 ? " 0" : " "))
-      +String(RTCDateTime.hour()) + ":" 
-      +String((RTCDateTime.minute() < 10 ? "0" : "")) 
-      +String(RTCDateTime.minute()) + ":"
-      +String((RTCDateTime.second() < 10 ? "0" : ""))
-      +String(RTCDateTime.second()) + " ");
+      String RTCDateTimeString=RTCDateTime.timestamp();
+      Serial.println(RTCDateTimeString.substring(RTCDateTimeString.indexOf("T")+1));
     } else {
       Serial.println("Unable to get time, RTC not available");
     }
   } else if (command.equals("<<EEPROMDATA")) {
     EepromData eepromData;
     if (readEepromData(eepromData) > 0) {
-      Serial.println(
-        String(eepromData.dateTime.year())
-        +String(eepromData.dateTime.month() < 10 ? "-0" : "-")
-        +String(eepromData.dateTime.month())
-        +String(eepromData.dateTime.day() < 10 ? "-0" : "-") 
-        +String(eepromData.dateTime.day())
-        +String(eepromData.dateTime.hour() < 10 ? " 0" : " ")        
-        +String(eepromData.dateTime.hour()) + ":" 
-        +String(eepromData.dateTime.minute() < 10 ? "0" : "") 
-        +String(eepromData.dateTime.minute()) + ":" 
-        +String(eepromData.dateTime.second() < 10 ? "0" : "")
-        +String(eepromData.dateTime.second())+" "
+      DateTime eepromDateTime = eepromData.dateTime;
+         Serial.println(eepromDateTime.timestamp()
         +String(eepromData.nextPulsePolarity>0?"+":"-")+" "
         +String(isDST(eepromData.dateTime) ? "D" : "W")+" "
         +String(eepromData.pausedTillNextDay ? "P" : "R")
@@ -445,6 +424,9 @@ void parseSerialCommands(String command) {
 // and advance if needed
 // - handle push button input
 void loop() {
+
+
+
   // self reset every week, just in case I f*cked up and some variable would
   // overflow left unchecked
   if (millis() >= 604800000UL) {
@@ -463,7 +445,6 @@ void loop() {
       i++;
     }
     parseSerialCommands(command);
-
   } 
 
   bool motorPulseEnable = digitalRead(motorPulseEnablePin) == HIGH;
@@ -473,6 +454,7 @@ void loop() {
   DateTime RTCDateTime = getRTCDateTime();
   // DST adjusted version of RTCDateTime
   DateTime dstAdjRTCDateTime = getDSTAdjustedTime(RTCDateTime);
+
 
   // EEPromTimeData is the last recorded time, polarity and no of writes on the
   // current eeprom page  that was pulsed to the moto
@@ -514,17 +496,20 @@ void loop() {
 
       // bookedPulse means a pulse (manual or automatd) has to be dealyed
       // because hardware protection cycle hadn't finished ther
+
       long rtcEepromTimeDiffSeconds = (dstAdjRTCDateTime - eepromData.dateTime).totalseconds();
+      //Serial.println(RTCDateTime.timestamp()+" "+lastPulseTime.timestamp());
       if (((rtcEepromTimeDiffSeconds > secsPerMinute) && ((RTCDateTime - lastPulseTime).totalseconds() > secsBetweenPulses)) || bookedPulseAuto) {
-        if ((rtcEepromTimeDiffSeconds / secsPerMinute >= MAX_CATCHUP_MINUTES) && !bookedPulseAuto) {
-          Serial.println("More than " + String(MAX_CATCHUP_MINUTES) + " minutes to catch up, pausing till next day");
-          // eepromData.dateTime = eepromData.dateTime +
-          // TimeSpan(SECONDS_PER_DAY);
-          eepromData.pausedTillNextDay = true;
-          writeTimeDataToEeprom(eepromData);
+        Serial.println(String(rtcEepromTimeDiffSeconds)+" "+String(bookedPulseAuto));
+        //check if we need to wait till tomorrow
+        if ((rtcEepromTimeDiffSeconds / secsPerMinute >= MAX_CATCHUP_MINUTES) && !bookedPulseAuto) {          
+          if (eepromData.pausedTillNextDay==false){
+            eepromData.pausedTillNextDay = true;
+            writeTimeDataToEeprom(eepromData);
+          }
+          blinkFeedbackLed(300, 50, 2);
         } else {
           // shoot a pulse
-
           if (digitalRead(waitNextPulseCyclePin) == LOW) {
             sendPulse(eepromData, pulseDurationMillis);
             // record the last pulsed time, advance by one minute
@@ -539,11 +524,12 @@ void loop() {
           }
         }
       }
-      if (eepromData.pausedTillNextDay) {
-        // signal I'm waiting for next day
-        blinkFeedbackLed(300, 50, 2);
-      }
     }
+
+    //pulseDebugStringToDisplay(eepromData, dstAdjRTCDateTime, motorPulseEnable,isDST(RTCDateTime));
+  
+  //Serial.println(String("DebugB ")+String(isDST(RTCDateTime))+" dstAdjRTCDateTime: "+String(dstAdjRTCDateTime.timestamp())+" RTCDateTime: "+String(RTCDateTime.timestamp()));
+  //delay(100);
 
     pulseDebugStringToDisplay(eepromData, dstAdjRTCDateTime, motorPulseEnable,isDST(RTCDateTime));
   }
@@ -564,6 +550,8 @@ void loop() {
       eepromData.dateTime = dstAdjRTCDateTime - TimeSpan(dstAdjRTCDateTime.second());
       eepromData.pausedTillNextDay = false;
       writeTimeDataToEeprom(eepromData);
+      //this helps when debugging, clock will start self adjustig immediately
+      lastPulseTime = dstAdjRTCDateTime;
       Serial.println("Manual Adjustment completed");
       delay(200); //avoid bounces
       pushButtonPressedMillis = 0;
@@ -574,7 +562,6 @@ void loop() {
     Serial.println("Manual pulse requested");
     pushButtonPressedMillis = 0;
     if (digitalRead(waitNextPulseCyclePin) == LOW) {
-      lastPulseTimeMillis = millis();
       blinkFeedbackLed(100, 0, 1);
       sendPulse(eepromData, pulseDurationMillis);
       eepromData.dateTime = eepromData.dateTime + TimeSpan(secsPerMinute);

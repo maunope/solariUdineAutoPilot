@@ -93,8 +93,8 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **Available commands**:
 
-- **>>DATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time
-- **>>DATETIMEFROMSERIAL** align RTC date and time to the current PC system clock
+- **>>DATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time, takes standard time, *not DST*.
+- **>>COMPILEDATETIME** align RTC date and time to the sketch compilation timestamp
 - **<<RTCDATETIME** print RTC date and time
 - **<<EEPROMDATA** print eeprom date, time and clock status information
 
