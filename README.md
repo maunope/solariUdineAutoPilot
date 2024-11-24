@@ -2,7 +2,7 @@
 
 
 # Disclaimer
-This is still a prototype, not yet tested on a real clock, use at your risk and plz **don't come whining if you damage your flip clock or set your house on fire.**
+This is still a prototype, the circuit design was built and tested on a perfboard, the kicad board design was never tested.  use at your risk and plz **don't come whining if you damage your flip clock or set your house on fire.**
 
 
 # Solari Udine Auto Pilot
@@ -46,7 +46,8 @@ The following features improve durability and operation:
 ## Circuit Board
 
 
-**WORK IN PROGRESS** check the schematic in this repo, board design is still wip
+**WORK IN PROGRESS** check the schematic in this repo, I've built and tested it on perfboard, board design might not be 100% correct, and definitely the layout could 
+use some improvement.
 
 
 <img src="controllersolari.png" width="640px" alt="Solari Udine Autopilot Circuit Board">
@@ -138,8 +139,7 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 ## Todo
 - Add support for bluetooth communication
-- Update/correct Tinkercad design
-- Upload kicad design
+- Improve kicad design
 
 
 

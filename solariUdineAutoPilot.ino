@@ -30,12 +30,13 @@ struct EepromData {
 };
 
 
-const int pushButtonPin = 1;
-const int waitNextPulseCyclePin = 2;
-const int motorPulseEnablePin = 6;
-const int feedbackLedPin = 7;
-const int motorPulseUpPin = 8;
-const int motorPulseDownPin = 9;
+const int pushButtonPin = 0; //////
+const int motorPulseEnablePin = 6; //////
+const int motorPulseUpPin = 7;
+const int motorPulseDownPin = 8;
+const int feedbackLedPin = 9;
+const int waitNextPulseCyclePin = 10;
+
 
 const int secsPerMinute = 60;
 
@@ -126,7 +127,7 @@ void setup() {
   }
   // if the rtc module is new, sets time to Sketch compile time. this only makes sense when running from Arduino IDE
   // Compile time is DST compensated (at least on macosx), converting back to standard time as we use only that in the RTC
-  if (rtc.lostPower() ) {
+  if (rtc.lostPower() || 1==1 ) {
     Serial.println("Power lost, resetting time. (check battery maybe?");
     //compile time 
     rtc.adjust(getStandardTime(DateTime(F(__DATE__), F(__TIME__))));
@@ -468,6 +469,7 @@ void loop() {
     lcd.setCursor(0, 0);
     lcd.print("Adj. time");
     Serial.println( "No valid time set in eeprom, please perform manual adjustment");
+    
     blinkFeedbackLed(300, 50, 5);
   } else {
     // regular operation
