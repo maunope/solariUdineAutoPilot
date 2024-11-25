@@ -155,10 +155,13 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **A:** >>EEPROMDATA command can extracts all the info saved on the eeprom
 
+**Q:** LCD doesn't display anyting, and/or serial messages are missing
+
+**A:** unset DEBUG_MODE build flag and upload firmware again
 
 
 ## Todo
-- Create proper sleep mode to save power
+- **Create proper sleep mode to save power** 
 - Add support for bluetooth communication
 - Improve kicad design
 
