@@ -103,8 +103,16 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 - **>>DATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time, takes standard time, *not DST*.
 - **>>COMPILEDATETIME** align RTC date and time to the sketch compilation timestamp
+- **<<COMPILETIME** print the sketch build timestamp
 - **<<RTCDATETIME** print RTC date and time
 - **<<EEPROMDATA** print eeprom date, time and clock status information
+
+## Build flags
+
+-DEBUG_MODE enable serial port and LCD debug messages, disbales sleep time  and force reinitialization of eeprom and rtc module on each read
+-FAST_DEBUG shortens intervals for debugging stuff when not connected to a real clock
+-SET_COMPILE_TIME_TO_RTC forces writing sketch build time to RTC on each boot, only use to program new rtc modules.
+
 
 ## Troubleshooting
 **Q:** Instead of catching up the clock is standing still and the "Paused until next day" pattern flashes:
@@ -148,7 +156,7 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 - Create proper sleep mode to save power
 - Add support for bluetooth communication
 - Improve kicad design
-
+- Create simplified kicad design
 
 
 

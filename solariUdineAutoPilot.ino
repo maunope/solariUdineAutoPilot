@@ -1,17 +1,12 @@
-
-
 #include <LiquidCrystal_I2C.h>  //https://github.com/johnrickman/LiquidCrystal_I2C
 #include <RTClib.h>             //https://github.com/adafruit/RTClib
 #include <Regexp.h>             //https://github.com/nickgammon/Regexp
 #include <SparkFun_External_EEPROM.h>  //https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library
 
 
-//watchdog timer flag for debug
-//volatile int f_wdt=1;
+//#define DEBUG_MODE
 
- //#define DEBUG_MODE
-
-// #define FAST_DEBUG
+//#define FAST_DEBUG
 
 //#define SET_COMPILE_TIME_TO_RTC
 
@@ -39,8 +34,8 @@ struct EepromData {
 };
 
 
-const int pushButtonPin = 0; //////
-const int motorPulseEnablePin = 6; //////
+const int pushButtonPin = 0; 
+const int motorPulseEnablePin = 6; 
 const int motorPulseUpPin = 7;
 const int motorPulseDownPin = 8;
 const int feedbackLedPin = 9;
@@ -49,9 +44,6 @@ const int waitNextPulseCyclePin = 10;
 
 const int secsPerMinute = 60;
 
-/*const int sleepDisableMillis = 10000;
-
-unsigned long lastButtonPushMillis=0;*/
 
 DateTime bootTime=DateTime((unsigned long)0);
 
@@ -90,51 +82,7 @@ unsigned long pushButtonPressedMillis = 0;
 // applies
 int pulseDurationMillis = 400;
 
-/*
 
-/*
-// watchdog interrupt
-ISR (WDT_vect) 
-{
-   wdt_disable();  // disable watchdog
-}  // end of WDT_vect
- 
-
-void deepSleep()
-{
-    // disable ADC
-  ADCSRA = 0;
-   // clear various "reset" flags
-  MCUSR = 0;     
-  // allow changes, disable reset
-  WDTCSR = bit (WDCE) | bit (WDE);
-  // set interrupt mode and an interval 
-  WDTCSR = bit (WDIE) | bit (WDP2) | bit (WDP1);    // set WDIE, and 1 second delay
-  wdt_reset();  // pat the dog 
-
-  wdt_enable(WDTO_8S); 
-
-   set_sleep_mode (SLEEP_MODE_IDLE);  
-  noInterrupts ();           // timed sequence follows
-  sleep_enable();
- 
-  // turn off brown-out enable in software
-  //MCUCR = bit (BODS) | bit (BODSE);
-  //MCUCR = bit (BODS); 
-  interrupts ();             // guarantees next instruction executed
-  sleep_mode();  
-  
-  // cancel sleep as a precaution
-  sleep_disable(); 
-  setup();
-}
-*/
-/*
-void wakeUp()
-{
-
-}
-*/
 
 void setup() {
 #ifdef FAST_DEBUG
@@ -515,7 +463,7 @@ void loop() {
    #ifdef DEBUG_MODE
     lcd.setCursor(0, 0);
     lcd.print("Adj. time");
-  #endif
+   #endif
     debugMessage( "No valid time set in eeprom, please perform manual adjustment");
   
     blinkFeedbackLed(300, 50, 5);
@@ -634,27 +582,7 @@ void loop() {
   
   //Serial.println(String(millis())+" "+String(lastButtonPushMillis)+" "+String(sleepDisableMillis)+" "+String((RTCDateTime - lastPulseTime).totalseconds())+" "+String(2*secsBetweenPulses)+" "+String(bookedPulseAuto)+" "+String(bookedPulseManual)+" "+String(motorPulseEnable));
   #ifndef DEBUG_MODE
-  delay(200);
-/*  if ((millis()-lastButtonPushMillis>sleepDisableMillis) &&   ((RTCDateTime - lastPulseTime).totalseconds()  > 2*secsBetweenPulses) && ! (bookedPulseAuto || bookedPulseManual) && motorPulseEnable){
-      Serial.println(String(millis())+" Going to sleep");
-      blinkFeedbackLed(100, 0, 1);
-      
-
-      Serial.end(); 
-        USBDevice.detach();
-      // attachInterrupt(0, pushButtonPin, CHANGE);
-      // ATmega328P, ATmega168
-      LowPower.powerDown(SLEEP_4S, ADC_ON, BOD_ON);
-      lastButtonPushMillis=millis();
-      if (digitalRead(pushButtonPin) == HIGH)
-      {
-        lastButtonPushMillis=millis();
-        blinkFeedbackLed(100, 50, 5);
-      }
-      Serial.begin(9600);
-        USBDevice.attach();
-      Serial.println(String(millis())+" I woke up");
-  }*/
+  delay(300);
   #endif
 
 
