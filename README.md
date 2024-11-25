@@ -82,7 +82,14 @@ Either for good or bad news, green led will flash. red will stay on when general
 
 The controller will now keep the flip clock display aligned with the internal RTC clock.
 
+
+## Push buttons commands
+
+- Brief press: advances the clock 1 minute, led blinks briefly
+- Three seconds press: aligns eeprom time with RTC time, for manual adjustment, led blinks on a pattern 
+
 ## Serial port commands
+
 
 Commands format: **(<<|>>)[A-Z]{1,10}[a-z,A-Z,0-9]{1,20}**
 
@@ -138,6 +145,7 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 
 ## Todo
+- Create proper sleep mode to save power
 - Add support for bluetooth communication
 - Improve kicad design
 
