@@ -49,9 +49,14 @@ The following features improve durability and operation:
 **WORK IN PROGRESS** check the schematic in this repo, I've built and tested it on perfboard, board design might not be 100% correct, and definitely the layout could 
 use some improvement.
 
-
 <img src="controllersolari.png" width="640px" alt="Solari Udine Autopilot Circuit Board">
 
+**"Simplified"** board version uses some 30% less components removing the following features:
+
+- Hardware limitation of pulses duration
+- Paralleled L293D outputs
+
+Considering how unlikely it is for the sketch to remain stuck with motor output set high, you might want to save yourself some hassle, expecially if you're building on perfboard.
 
 **How to read led signals**
 
@@ -156,7 +161,6 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 - Create proper sleep mode to save power
 - Add support for bluetooth communication
 - Improve kicad design
-- Create simplified kicad design
 
 
 
