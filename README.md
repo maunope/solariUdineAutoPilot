@@ -159,6 +159,9 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **A:** unset DEBUG_MODE build flag and upload firmware again
 
+**Q:** That PCB design is **lame**!
+
+**A:** It is. any help much appreciated! ;-)
 
 ## Todo
 - **Create proper sleep mode to save power** 
