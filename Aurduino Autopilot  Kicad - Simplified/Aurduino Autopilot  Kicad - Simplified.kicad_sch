@@ -3399,6 +3399,12 @@
 		(uuid "4b8c57f6-77eb-4432-94e8-dd03851390ab")
 	)
 	(junction
+		(at 297.18 54.61)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "572f9ff2-e31b-4aed-9569-31f74101b4ad")
+	)
+	(junction
 		(at 297.18 90.17)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3427,6 +3433,12 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "9178cb72-b0b8-4e2c-a99f-4191d3d76e97")
+	)
+	(junction
+		(at 294.64 57.15)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "9863eaaf-4ee5-47e7-84d7-aeff0276d34a")
 	)
 	(junction
 		(at 294.64 87.63)
@@ -3613,6 +3625,16 @@
 			(type default)
 		)
 		(uuid "1f722fe9-9071-4464-a19c-03b371d80d04")
+	)
+	(wire
+		(pts
+			(xy 288.29 54.61) (xy 297.18 54.61)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2144a15c-f4c4-4a71-b29f-7cb812ccbf8f")
 	)
 	(wire
 		(pts
@@ -3956,6 +3978,16 @@
 	)
 	(wire
 		(pts
+			(xy 288.29 52.07) (xy 288.29 54.61)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6bb8683b-e58c-4e11-82ec-bf80595a2e27")
+	)
+	(wire
+		(pts
 			(xy 207.01 140.97) (xy 207.01 144.78)
 		)
 		(stroke
@@ -4136,6 +4168,16 @@
 	)
 	(wire
 		(pts
+			(xy 294.64 57.15) (xy 294.64 64.77)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a305237e-f3f6-412d-b769-e81552193804")
+	)
+	(wire
+		(pts
 			(xy 223.52 69.85) (xy 243.84 69.85)
 		)
 		(stroke
@@ -4286,7 +4328,7 @@
 	)
 	(wire
 		(pts
-			(xy 297.18 44.45) (xy 297.18 62.23)
+			(xy 297.18 44.45) (xy 297.18 54.61)
 		)
 		(stroke
 			(width 0)
@@ -4313,6 +4355,16 @@
 			(type default)
 		)
 		(uuid "c24d09fb-c75f-4354-8da9-af16c32cd15c")
+	)
+	(wire
+		(pts
+			(xy 280.67 52.07) (xy 280.67 57.15)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c67c87aa-3ca0-4793-bbc5-f1a220464a42")
 	)
 	(wire
 		(pts
@@ -4396,6 +4448,16 @@
 	)
 	(wire
 		(pts
+			(xy 297.18 54.61) (xy 297.18 62.23)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "e6bc820c-bd89-4433-8c84-5c2369ad5474")
+	)
+	(wire
+		(pts
 			(xy 88.9 44.45) (xy 95.25 44.45)
 		)
 		(stroke
@@ -4413,16 +4475,6 @@
 			(type default)
 		)
 		(uuid "e98188e9-6a8b-44ca-8ce8-2d692d53fbc1")
-	)
-	(wire
-		(pts
-			(xy 254 31.75) (xy 254 52.07)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "ead50040-3e85-44d0-ac27-4b4383a9f678")
 	)
 	(wire
 		(pts
@@ -4476,6 +4528,16 @@
 	)
 	(wire
 		(pts
+			(xy 280.67 57.15) (xy 294.64 57.15)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "f0c9f529-6e6b-46e0-a7ed-b0c481b7457d")
+	)
+	(wire
+		(pts
 			(xy 297.18 62.23) (xy 297.18 90.17)
 		)
 		(stroke
@@ -4516,7 +4578,7 @@
 	)
 	(wire
 		(pts
-			(xy 294.64 46.99) (xy 294.64 64.77)
+			(xy 294.64 46.99) (xy 294.64 57.15)
 		)
 		(stroke
 			(width 0)
@@ -4615,6 +4677,72 @@
 			(project ""
 				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
 					(reference "#PWR0116")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+5V")
+		(at 280.67 44.45 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "03b71a84-c7cb-4022-ae1f-f79fdf6acfd3")
+		(property "Reference" "#PWR07"
+			(at 280.67 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+5V"
+			(at 280.67 39.37 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 280.67 44.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 280.67 44.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+5V\""
+			(at 280.67 44.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "a35dfba9-008f-4eed-a12d-dc9409f50e4f")
+		)
+		(instances
+			(project "Aurduino Autopilot  Kicad - Simplified"
+				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
+					(reference "#PWR07")
 					(unit 1)
 				)
 			)
@@ -4907,72 +5035,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:+5V")
-		(at 261.62 52.07 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "1f9354c3-dbb0-46d2-a707-a45cf364f5dd")
-		(property "Reference" "#PWR0115"
-			(at 261.62 55.88 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "+5V"
-			(at 261.62 46.99 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 261.62 52.07 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 261.62 52.07 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"+5V\""
-			(at 261.62 52.07 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "4d19267a-24e3-44a8-bd22-26cf3fe11185")
-		)
-		(instances
-			(project "Arduino Autopilot"
-				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
-					(reference "#PWR0115")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:LED")
 		(at 227.33 111.76 90)
 		(unit 1)
@@ -5037,6 +5099,75 @@
 			(project ""
 				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
 					(reference "feedback_led1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 280.67 48.26 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "2bc17cde-c9f6-4993-96bc-6ab17361affd")
+		(property "Reference" "pu_i2c1"
+			(at 283.21 46.9899 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "R"
+			(at 283.21 49.5299 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
+			(at 278.892 48.26 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 280.67 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 280.67 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "b2802a4a-01a5-4a1d-8a40-5ba17fdd8028")
+		)
+		(pin "2"
+			(uuid "43d1094e-f916-4221-9452-3a92a315ad22")
+		)
+		(instances
+			(project "Aurduino Autopilot  Kicad - Simplified"
+				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
+					(reference "pu_i2c1")
 					(unit 1)
 				)
 			)
@@ -6304,6 +6435,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+5V")
+		(at 254 52.07 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "8941b04f-6c23-46a8-8e59-1f60a6e66dde")
+		(property "Reference" "#PWR06"
+			(at 254 55.88 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+5V"
+			(at 254 46.99 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 254 52.07 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 254 52.07 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+5V\""
+			(at 254 52.07 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "c13a4140-b0cf-45ed-b736-a3946c0a5699")
+		)
+		(instances
+			(project "Aurduino Autopilot  Kicad - Simplified"
+				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
+					(reference "#PWR06")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:C_Small")
 		(at 224.79 43.18 0)
 		(unit 1)
@@ -6728,6 +6925,72 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+5V")
+		(at 254 31.75 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "999d04bc-0d46-4bd0-8893-99202a62c3d9")
+		(property "Reference" "#PWR05"
+			(at 254 35.56 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+5V"
+			(at 254 26.67 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 254 31.75 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 254 31.75 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+5V\""
+			(at 254 31.75 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "d3b6a427-2ae6-4903-b4bb-14baf45fd16e")
+		)
+		(instances
+			(project "Aurduino Autopilot  Kicad - Simplified"
+				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
+					(reference "#PWR05")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 99.06 125.73 0)
 		(unit 1)
@@ -6787,6 +7050,75 @@
 			(project "Arduino Autopilot"
 				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
 					(reference "#PWR0127")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:R")
+		(at 288.29 48.26 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "a67eac36-fcfd-4756-b054-c4a329b2315c")
+		(property "Reference" "pu_i2c2"
+			(at 290.83 46.9899 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "R"
+			(at 290.83 49.5299 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
+			(at 286.512 48.26 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 288.29 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 288.29 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "db724c34-9518-41d1-9349-10c1fc3f54ec")
+		)
+		(pin "2"
+			(uuid "29250e30-4054-40cb-8465-302c2e61cc91")
+		)
+		(instances
+			(project "Aurduino Autopilot  Kicad - Simplified"
+				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
+					(reference "pu_i2c2")
 					(unit 1)
 				)
 			)
@@ -7895,6 +8227,72 @@
 			(project "Arduino Autopilot"
 				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
 					(reference "#PWR0125")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+5V")
+		(at 288.29 44.45 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "eba4b5f8-5fbc-4f2c-b972-6e047f9423ba")
+		(property "Reference" "#PWR08"
+			(at 288.29 48.26 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+5V"
+			(at 288.29 39.37 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 288.29 44.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 288.29 44.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+5V\""
+			(at 288.29 44.45 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "705cd47f-50bb-4149-8f6f-a23b8e7d291d")
+		)
+		(instances
+			(project "Aurduino Autopilot  Kicad - Simplified"
+				(path "/3489e4e4-f52f-4668-825e-6a42b8a351f1"
+					(reference "#PWR08")
 					(unit 1)
 				)
 			)

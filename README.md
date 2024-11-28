@@ -8,7 +8,7 @@ This is still a prototype, the circuit design was built and tested on a perfboar
 # Solari Udine Auto Pilot
 
 
-Arduino based Solari Udine Clock controller, suitable for alternating pulse Solari Udine Clock motors (i.e. Cifra 12). Controls hours and minutes, no calendar functions are provided.
+Arduino based Solari Udine Clock controller, suitable for alternating pulse Solari Udine Clock motors (i.e. Cifra 12). Controls hours and minutes, no calendar functions are provided. The current board design accepts a single Vcc in, either 12V or 24V, from an external power source. 
 
 
 **Main features:**
@@ -32,6 +32,7 @@ The following features improve durability and operation:
 - Eeprom writes are spread over a 256kbit eeprom, this should guarantee at least 20 years of operation before writes start to fail, more likely 50-70
 - If eeprom stored time is unavailable, the clock halts until it is adjusted
 - If RTC module is unavailable, the clock blinks for 30 seconds and then resets
+- The Arduino will stay powered down approx 95% of the time during regular operation, saving considerable power. As a side effect, minutes will flip within +/- 2 seconds of when RTC time ticks a minute.  
 
 
 ## Dependencies
@@ -41,6 +42,7 @@ The following features improve durability and operation:
 - [RTClib](https://github.com/adafruit/RTClib)
 - [Regexp](https://github.com/nickgammon/Regexp)
 - [SparkFun External EEPROM Arduino Library](https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library)
+- [Rocket Scream Low Power](https://github.com/rocketscream/Low-Power)
 
 
 ## Circuit Board
@@ -88,13 +90,22 @@ Either for good or bad news, green led will flash. red will stay on when general
 The controller will now keep the flip clock display aligned with the internal RTC clock.
 
 
+## Enabling motor movement
+
+A switch allows to pause motor movement for maintenance and dialing in commands, the clock will catch up automatically once enable is resumed.
+A led will remain **ON** while movement is paused.
+the switch also disables deep sleep time and prepares the Arduino for accepting commands: wait until feedback led blinks once after pausing movement, then dial button or serial commands.
+
 ## Push buttons commands
+
+*Important* only dial pushbutton commands with the motor enable switch turned off 
 
 - Brief press: advances the clock 1 minute, led blinks briefly
 - Three seconds press: aligns eeprom time with RTC time, for manual adjustment, led blinks on a pattern 
 
 ## Serial port commands
 
+*Important* only dial serial commands with the motor enable switch turned off 
 
 Commands format: **(<<|>>)[A-Z]{1,10}[a-z,A-Z,0-9]{1,20}**
 
@@ -115,7 +126,6 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 ## Build flags
 
 -DEBUG_MODE enable serial port and LCD debug messages, disbales sleep time  and force reinitialization of eeprom and rtc module on each read
--FAST_DEBUG shortens intervals for debugging stuff when not connected to a real clock
 -SET_COMPILE_TIME_TO_RTC forces writing sketch build time to RTC on each boot, only use to program new rtc modules.
 
 
@@ -159,14 +169,20 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **A:** unset DEBUG_MODE build flag and upload firmware again
 
+**Q:** **(serial|button) commands** are not working!
+
+**A:** they only work reliably when motor movement is paused (solid red led), during regular operation the Arduino is awake and responding to commands for only approx 50ms every second, good luck catching it awake! :-) 
+
 **Q:** That PCB design is **lame**!
 
 **A:** It is. any help much appreciated! ;-)
 
 ## Todo
-- **Create proper sleep mode to save power** 
+- add drift compensation for crappy RTC modules
+- when disabling motion while sleep is skipped (i.e. 2 secs after a pulse), feedback led doens't blink
 - Add support for bluetooth communication
 - Improve kicad design
+- Figure some predictable behavior for when RTC is known to be f*cked up, i.e start from 1970 and stop calculating dst
 
 
 
