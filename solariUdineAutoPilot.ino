@@ -14,6 +14,7 @@
 struct EepromIndexDescriptor {
   unsigned long signature;
   int pageOffset = 0;
+  int dailySecondsOffset=0;
 };
 
 // struct for clock status to be saved to the eeprom
@@ -66,7 +67,7 @@ bool bookedPulseManual = false;
 bool bookedPulseAuto = false;
 // how long the push button has been pressed
 unsigned long pushButtonPressedMillis = 0;
-
+DateTime lastDailyOffsetCorrection= DateTime((uint32_t)0);
 
 
 //Optional LCD Display
@@ -129,6 +130,8 @@ void setup() {
   if (bootTime == DateTime((unsigned long)0)) {
     bootTime = getRTCDateTime();
   }
+  lastDailyOffsetCorrection=bootTime;
+
 }
 
 
@@ -252,6 +255,50 @@ int readEepromData(EepromData& eepromData) {
   return 1;  // Data read successfully
 }
 
+//reads daily seconds offset from eeprom, returns 0 if can't read
+int getDailySecondsOffsetFromEpprom() {
+   const int eepromIndexDescriptorSizeBytes = ceil(sizeof(EepromIndexDescriptor) / (float)EEPROM_PAGE_SIZE_BYTES) * EEPROM_PAGE_SIZE_BYTES;
+
+  EepromIndexDescriptor eepromIndexDescriptor;
+  // check if first 4 bytes contain the required signature string
+  extEeprom.get(0, eepromIndexDescriptor);
+
+
+  if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
+    // EEPROM is not initialized, write the signature and default address and
+    // set 0 writes in counter
+    debugMessage("getDailySecondsOffsetFromEpprom, EEprom not initialized, canll writeEepromData first");
+    return 0;
+  }
+  return eepromIndexDescriptor.dailySecondsOffset;
+}
+
+// writes dailySecondsOffset in the eeprom, returns -1 if can't write
+int writeDailySecondsOffsetToEpprom(int dailySecondsOffset) {
+  const int eepromIndexDescriptorSizeBytes = ceil(sizeof(EepromIndexDescriptor) / (float)EEPROM_PAGE_SIZE_BYTES) * EEPROM_PAGE_SIZE_BYTES;
+
+  EepromIndexDescriptor eepromIndexDescriptor;
+  eepromIndexDescriptor.signature = 0;
+
+  // check if first 4 bytes contain the required signature string
+  extEeprom.get(0, eepromIndexDescriptor);
+
+
+  if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
+    // EEPROM is not initialized, write the signature and default address and
+    // set 0 writes in counter
+    debugMessage("writeDailySecondsOffsetToEpprom, EEprom not initialized, canll writeEepromData first");
+    return -1;
+  }
+  eepromIndexDescriptor.dailySecondsOffset=dailySecondsOffset;
+
+
+  extEeprom.put(0,eepromIndexDescriptor);
+  return 1;
+}
+
+
+
 // returns true if give DateTime is DST, applies Central Europe rules
 bool isDST(DateTime time) {
   // Calculate the last Sunday of March
@@ -337,9 +384,23 @@ void pulseDebugStringToDisplay(EepromData eepromData, DateTime dstAdjDateTime, b
 void parseSerialCommands(String command) {
   // match state object
   MatchState ms;
-  ms.Target(command.c_str()) a
+  ms.Target(command.c_str());
   debugMessage(command);
-  if (ms.Match(">>DATETIME[0-9]+")) {
+  if (ms.Match(">>DAILYSECONDSOFFSET[+-][0-9]+$")) {
+    command.replace(">>DAILYSECONDSOFFSET", "");
+    int dailySecondsOffset=command.toInt();
+    if (writeDailySecondsOffsetToEpprom(dailySecondsOffset)){
+      Serial.println("Wrote "+String(dailySecondsOffset)+" daily seconds offset to eeprom");
+    }
+    else
+    {
+            Serial.println("Failed to write "+String(dailySecondsOffset)+" daily seconds offset to eeprom");
+    }
+  }
+  else if (ms.Match("<<DAILYSECONDSOFFSET")) {
+      Serial.println("Daily seconds offset stored in eeprom :"+String(getDailySecondsOffsetFromEpprom()));
+  }
+  else if (ms.Match(">>DATETIME[0-9]+")) {
     int year = command.substring(10, 14).toInt();
     int month = command.substring(14, 16).toInt();
     int day = command.substring(16, 18).toInt();
@@ -412,6 +473,7 @@ void loop() {
     parseSerialCommands(command);
   }
 
+
   bool motorPulseEnable = digitalRead(MOTOR_PULSE_ENABLE_PIN) == HIGH;
 
   // RTCDateTime is the time coming from the battery backed Real Time Clock
@@ -419,6 +481,20 @@ void loop() {
   DateTime RTCDateTime = getRTCDateTime();
   // DST adjusted version of RTCDateTime
   DateTime dstAdjRTCDateTime = getDSTAdjustedTime(RTCDateTime);
+
+  //once every 24hours, apply seconds offset to compensate RTC drift
+  //24hrs are counted since boot, considering power outages are expected to be rare, it's worth drifting a few seconds
+  //every now and then to spare eeprom writes, in case of a long power outage, a manual time set is advisable anyway
+  if ((RTCDateTime-lastDailyOffsetCorrection).totalseconds() >= SECONDS_PER_DAY)
+  {
+    int dailySecondsOffset=getDailySecondsOffsetFromEpprom();
+    if (dailySecondsOffset!=0){
+      RTCDateTime=RTCDateTime+TimeSpan(dailySecondsOffset);
+      rtc.adjust(RTCDateTime); 
+      debugMessage("Applied daily seconds offset: "+String(dailySecondsOffset));
+    }
+    lastDailyOffsetCorrection=RTCDateTime;
+  }
 
   // self reset every week, just in case I f*cked up and some variable would
   // overflow left unchecked
@@ -554,7 +630,7 @@ void loop() {
 //won't sleep if motorPulseEnable is off, this helps debugging :-)
 
 //Serial.println(String(millis())+" "+String(lastButtonPushMillis)+" "+String(sleepDisableMillis)+" "+String((RTCDateTime - lastPulseTime).totalseconds())+" "+String(2*SECS_BETWEEN_PULSES)+" "+String(bookedPulseAuto)+" "+String(bookedPulseManual)+" "+String(motorPulseEnable));
-#ifdef DEBUG_MODE
+#ifndef DEBUG_MODE
   //motorPulseEnable = digitalRead(MOTOR_PULSE_ENABLE_PIN) == HIGH;
   /*
     won't go to sleep if Motor enable is disabled AND:

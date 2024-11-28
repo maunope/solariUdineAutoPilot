@@ -119,9 +119,11 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 - **>>DATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time, takes standard time, *not DST*.
 - **>>COMPILEDATETIME** align RTC date and time to the sketch compilation timestamp
+- **>>DAILYSECODNSOFFSET[+-][0-9]+$** (i.e: >>DAILYSECODNSOFFSET+10, DAILYSECODNSOFFSET+0, DAILYSECODNSOFFSET-20) stores the desided number of daily RTC error compensation to eeprom.
 - **<<COMPILETIME** print the sketch build timestamp
 - **<<RTCDATETIME** print RTC date and time
 - **<<EEPROMDATA** print eeprom date, time and clock status information
+- **<<DAILYSECODNSOFFSET** print daily seconds of  RTC error correction setting stored in the eeprom
 
 ## Build flags
 
@@ -172,6 +174,14 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 **Q:** **(serial|button) commands** are not working!
 
 **A:** they only work reliably when motor movement is paused (solid red led), during regular operation the Arduino is awake and responding to commands for only approx 50ms every second, good luck catching it awake! :-) 
+
+**Q:** My clock drifts X seconds ahead/behind everyday
+
+**A:** Buy a proper RTC module next time! :-) there's an handy feature to correct this, if the drift is the same every day, see serial commands
+
+**Q:** My clock drifts X *minutes* ahead/behind everyday
+
+**A:** Hikes! that's not OK! try a different RTC module, then check your board for errors on I2C bus pullup resistors and +5v power. I've tested the board design powering I2C devices straight from a tension regulator bypassing the Arduino's internal one, either do the same or dig  sleep configurations to figure how to keep the RTC powered during sleep. In case you figure something out, opena PR here :-)
 
 **Q:** That PCB design is **lame**!
 
