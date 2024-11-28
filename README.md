@@ -60,6 +60,11 @@ use some improvement.
 
 Considering how unlikely it is for the sketch to remain stuck with motor output set high, you might want to save yourself some hassle, expecially if you're building on perfboard.
 
+I've built the board using these cheap DS3231 bought off Amazon, the design uses a male connector matching their Vcc-signal-signal-NC-Ground pinout, you might want to use something different and change the board design accordingly.
+
+<img src="rtcmodule.png" width="640px" alt="RTC Module">
+
+
 **How to read led signals**
 
 
