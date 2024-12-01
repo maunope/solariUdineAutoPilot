@@ -79,17 +79,17 @@ Either for good or bad news, green led will flash. red will stay on when general
 
 
 **First things first, let's not fry stuff**
-- If you built the board yourself, power it on while hooked up to Arduino IDE at least once to prime the RTC module
-- Check your clock coil working voltage. Most accept 24V plus 12V or 48V with different wiring. **The current board design assumes both the coil and the arduino can be powered with 12V**
+- If you built the board yourself,  either run the Arduino sketch with  SET_COMPILE_TIME_TO_RTC flag turned on or use serial commands to prime the RTC module.
+- Check your clock coil working voltage. Most accept 24V plus 12V or 48V with different wiring. **The current board design was tested with a 12 V external power source, 24V should work fine albeit with the tension regulator running hotter, 48V is beyond the regulator specs**
 - Check your coil max current draw, one L293D with paralleled channels can drive up to 1200mA, no Solari Udine clock should draw more than that
-- Unplug the clock, wire your 12V power supply and the clock motor coil
+- Unplug the clock, wire your power supply and the clock motor coil
 - Turn the enable switch *OFF*
-- Power the board
+- Power the board.
  **No smoke? good.**
 - On the first start, a manual time adjust is required,  "Time Adjustment Required" pattern will flash on the feedback led
 - Manually adjust the clock flip rolls to match current time, the optional LCD display displays it on the first line
 - Dial at least one minute advance with the button, this will prime pulse direction
-- When the clock time matches RTC time, *Press the push button for 3 seconds until "Manual Time Adjustment Saved" pattern flashed*
+- When the clock time matches RTC time, *Press the push button for 3 seconds until "Manual Time Adjustment Saved" pattern flashes*
 - Turn the enable switch *ON*
 
 
@@ -115,7 +115,7 @@ the switch also disables deep sleep time and prepares the Arduino for accepting 
 
 Commands format: **(<<|>>)[A-Z]{1,10}[a-z,A-Z,0-9]{1,20}**
 
-- **<<** to get something, **>>** to set
+- **<<** to read info, **>>** to set
 - command name, in caps
 - (where applicable) parameter
 
@@ -123,13 +123,16 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **Available commands**:
 
-- **>>DATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time, takes standard time, *not DST*.
+- **<<BOOTTIMESTAMP** prints the curent boot timestamp
 - **>>COMPILEDATETIME** align RTC date and time to the sketch compilation timestamp
+- **<<COMPILEDATETIME** print the sketch build timestamp
 - **>>DAILYSECODNSOFFSET[+-][0-9]+$** (i.e: >>DAILYSECODNSOFFSET+10, DAILYSECODNSOFFSET+0, DAILYSECODNSOFFSET-20) stores the desided number of daily RTC error compensation to eeprom.
-- **<<COMPILETIME** print the sketch build timestamp
-- **<<RTCDATETIME** print RTC date and time
-- **<<EEPROMDATA** print eeprom date, time and clock status information
 - **<<DAILYSECODNSOFFSET** print daily seconds of  RTC error correction setting stored in the eeprom
+- **>>DATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time, takes standard time, *not DST*.
+- **<<EEPROMDATA** print eeprom date, time and clock status information
+- **<<RTCDATETIME** print RTC date and time
+
+
 
 ## Build flags
 
@@ -144,7 +147,7 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 **A:** When more than 120 minutes are to be catched up, automatic adjustment will pause and wait for clock time to be right again the next day.
 
 
-**Q:** The arduino keeps resetting every half a minute or so, the feedback led flashes
+**Q:** The Arduino keeps resetting every half a minute or so, the feedback led flashes
 
 
 **A:**  Either the eeprom or RTC clock aren't responding, the board needs fixing
@@ -153,7 +156,7 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 **Q:**  I've hooked up a display, now what?
 
 
-**A:**
+**A:** Note that the display only works when DEBUG_MODE flag is raised
 
 
 <img src="displaycodes.png" width="640px" alt="Optional display fields">
@@ -166,8 +169,7 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **Q:** My RTC module lost its time configuration!
 
-**A:** >>DATETIME command should fix it, however, it could happen again, the module batttery might be drained
-
+**A:** >>DATETIME command should fix it, however, if it happens again, the module batttery might be drained
 
 **Q:** I can't tell what's going on with eeprom data
 
@@ -175,15 +177,15 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **Q:** LCD doesn't display anyting, and/or serial messages are missing
 
-**A:** unset DEBUG_MODE build flag and upload firmware again
+**A:** set DEBUG_MODE build flag and upload firmware again
 
 **Q:** **(serial|button) commands** are not working!
 
-**A:** they only work reliably when motor movement is paused (solid red led), during regular operation the Arduino is awake and responding to commands for only approx 50ms every second, good luck catching it awake! :-) 
+**A:** they only work reliably when motor movement is paused (solid red led), during regular operation the Arduino is awake and responding to commands for only few seconds per minute, good luck catching it awake! :-) 
 
 **Q:** My clock drifts X seconds ahead/behind everyday
 
-**A:** Buy a proper RTC module next time! :-) there's an handy feature to correct this, if the drift is the same every day, see serial commands
+**A:** Buy a proper RTC module next time! :-) there's a handy feature to correct this, if the drift is the same every day, see serial commands
 
 **Q:** My clock drifts X *minutes* ahead/behind everyday
 
@@ -194,7 +196,6 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 **A:** It is. any help much appreciated! ;-)
 
 ## Todo
-- add drift compensation for crappy RTC modules
 - when disabling motion while sleep is skipped (i.e. 2 secs after a pulse), feedback led doens't blink
 - Add support for bluetooth communication
 - Improve kicad design

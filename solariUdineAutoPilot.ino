@@ -5,7 +5,7 @@
 #include <SparkFun_External_EEPROM.h>  //https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library
 
 
-#define DEBUG_MODE
+//#define DEBUG_MODE
 
 //never leave this flag on on regular operation, it pretty much defeats the purpose of using this board 
 //#define SET_COMPILE_TIME_TO_RTC
@@ -400,6 +400,9 @@ void parseSerialCommands(String command) {
   else if (ms.Match("<<DAILYSECONDSOFFSET")) {
       Serial.println("Daily seconds offset stored in eeprom :"+String(getDailySecondsOffsetFromEpprom()));
   }
+  else if (ms.Match("<<BOOTTIMESTAMP")) {
+      Serial.println("Boot timestamp :"+bootTime.timestamp());
+  }
   else if (ms.Match(">>DATETIME[0-9]+")) {
     int year = command.substring(10, 14).toInt();
     int month = command.substring(14, 16).toInt();
@@ -443,7 +446,7 @@ void parseSerialCommands(String command) {
     } else {
       Serial.println("Unable to read eeprom data");
     }
-  } else if (command.equals("<<COMPILETIME")) {
+  } else if (command.equals("<<COMPILEDATETIME")) {
     Serial.println("Software compiled on: " + getStandardTime(DateTime(F(__DATE__), F(__TIME__))).timestamp());
   } else if (!command.equals("")){
     Serial.println("Unknown command: " + command);
