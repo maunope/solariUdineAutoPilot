@@ -169,11 +169,11 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **Q:** My RTC module lost its time configuration!
 
-**A:** >>DATETIME command should fix it, however, if it happens again, the module batttery might be drained
+**A:** >>DATETIME[0-9]+ command should fix it, however, if it happens again, the module batttery might be drained
 
 **Q:** I can't tell what's going on with eeprom data
 
-**A:** >>EEPROMDATA command can extracts all the info saved on the eeprom
+**A:** <<EEPROMDATA command can extracts all the info saved on the eeprom
 
 **Q:** LCD doesn't display anyting, and/or serial messages are missing
 
@@ -189,7 +189,7 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **Q:** My clock drifts X *minutes* ahead/behind everyday
 
-**A:** Hikes! that's not OK! try a different RTC module, then check your board for errors on I2C bus pullup resistors and +5v power. I've tested the board design powering I2C devices straight from a tension regulator bypassing the Arduino's internal one, either do the same or dig  sleep configurations to figure how to keep the RTC powered during sleep. In case you figure something out, opena PR here :-)
+**A:** Hikes! that's not OK! try a different RTC module, then check your board for errors on I2C bus pullup resistors and +5v power. I've tested the board design powering I2C devices straight from a tension regulator bypassing the Arduino's internal one, either do the same or dig  sleep configurations to figure how to keep the RTC powered during sleep. In case you figure something out, open a PR here :-)
 
 **Q:** That PCB design is **lame**!
 
