@@ -2,7 +2,7 @@
 
 
 # Disclaimer
-This is still a prototype, the circuit design was built and tested on a perfboard, the kicad board design was never tested.  use at your risk and plz **don't come whining if you damage your flip clock or set your house on fire.**
+This is still a prototype, the circuit design was built and tested on a perfboard, the kicad board design was never tested.  use at your risk and plz **don't  come whining if you damage your flip clock or set your house on fire.**
 
 
 # Solari Udine Auto Pilot
@@ -15,7 +15,7 @@ Arduino based Solari Udine Clock controller, suitable for alternating pulse Sola
 - Self adjusts after a power loss
 - Handles DST (Central Europe rules)
 - Allows manual adjustment
-
+ 
 
 A led provides visual feedback, an optional LCD1602 can be plugged in to display status.
 
