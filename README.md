@@ -11,7 +11,7 @@ This is still a prototype, the circuit design was built and tested on a perfboar
 Arduino based Solari Udine Clock controller, suitable for alternating pulse Solari Udine Clock motors (i.e. Cifra 12). Controls hours and minutes, no calendar functions are provided. The current board design accepts a single Vcc in, either 12V or 24V, from an external power source. 
 
 
-**Main features:**
+**Main features:**   
 - Self adjusts after a power loss
 - Handles DST (Central Europe rules)
 - Allows manual adjustment
@@ -79,7 +79,7 @@ Either for good or bad news, green led will flash. red will stay on when general
 
 
 **First things first, let's not fry stuff**
-- If you built the board yourself,  either run the Arduino sketch with  SET_COMPILE_TIME_TO_RTC flag turned on or use serial commands to prime the RTC module.
+- If you built the board yourself, either run the Arduino sketch with  SET_COMPILE_TIME_TO_RTC flag turned on or use serial commands to prime the RTC module.
 - Check your clock coil working voltage. Most accept 24V plus 12V or 48V with different wiring. **The current board design was tested with a 12 V external power source, 24V should work fine albeit with the tension regulator running hotter, 48V is beyond the regulator specs**
 - Check your coil max current draw, one L293D with paralleled channels can drive up to 1200mA, no Solari Udine clock should draw more than that
 - Unplug the clock, wire your power supply and the clock motor coil
