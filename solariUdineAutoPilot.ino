@@ -499,10 +499,10 @@ void loop() {
     lastDailyOffsetCorrection=RTCDateTime;
   }
 
-  // self reset every week, just in case I f*cked up and some variable would
-  // overflow left unchecked
+  // self reset every week+1hour, just in case I f*cked up and some variable would
+  // overflow left unchecked. extra hour leaves room for eeprom page roll to happen
   //Serial.println(String((RTCDateTime-bootTime).totalseconds())+" "+String(SECONDS_PER_DAY*7));
-  if ((RTCDateTime - bootTime).totalseconds() >= SECONDS_PER_DAY * 7) {
+  if ((RTCDateTime - bootTime).totalseconds() >= (SECONDS_PER_DAY+3600) * 7) {
     asm volatile("  jmp 0");
   }
 
