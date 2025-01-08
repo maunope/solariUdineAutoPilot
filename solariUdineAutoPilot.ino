@@ -205,10 +205,6 @@ int writeTimeDataToEeprom(EepromData& eepromData) {
 
   // switch to next page if the number of writes on the current one exceeds the
   // desided value
-  //  in case of power failure currentWrites will be reset and the current page
-  //  will get more writes than
-  // planned, this is a fair tradeoff as outages are infrequent and updating the
-  // index page on each write would quickly wear it off
   if (currentEepromData.currentWrites > MAX_WRITE_PER_EEPROM_PAGE) {
     // debugMessage(String(currentEepromData.currentWrites) + " ->next page "
     // + String(eepromIndexDescriptor.pageOffset)); switch forward one page, if
@@ -499,10 +495,10 @@ void loop() {
     lastDailyOffsetCorrection=RTCDateTime;
   }
 
-  // self reset every week+1hour, just in case I f*cked up and some variable would
-  // overflow left unchecked. extra hour leaves room for eeprom page roll to happen
+  // self reset every week+5minutes, just in case I f*cked up and some variable would
+  // overflow left unchecked. 
   //Serial.println(String((RTCDateTime-bootTime).totalseconds())+" "+String(SECONDS_PER_DAY*7));
-  if ((RTCDateTime - bootTime).totalseconds() >= (SECONDS_PER_DAY+3600) * 7) {
+  if ((RTCDateTime - bootTime).totalseconds() >= (SECONDS_PER_DAY * 7)+300) {
     asm volatile("  jmp 0");
   }
 
