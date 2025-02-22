@@ -24,6 +24,7 @@ The software tries to mitigate strain on the flip clock limiting the number and 
 - Turns are limited to 1 every 3 seconds (manual step adjustment bypasses this)
 - If the clock is more than 120 minutes behind, movement is paused till the next day (a halted clock displays the right time once a day after all **:-)**)
 - If the eeprom or rtc module fail, no pulses are sent to the motor
+- If the rtc module crashes, attempts are made to restore the last known consistent timestamp
 - A hardware circuit limits pulse duration and frequency to 1 second.
 - the circuit board has hardware protection avoiding prolonged motor pulses, set to 1 second. Once a pulse is sent, following ones are delayed until the hw protection has completed its cycle. Note that it is totally possible to build the board without the 555 timer, just hardwire L293D enable pins to high, software will work just fine.
 
@@ -128,9 +129,10 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 - **<<COMPILEDATETIME** print the sketch build timestamp
 - **>>DAILYSECODNSOFFSET[+-][0-9]+$** (i.e: >>DAILYSECODNSOFFSET+10, DAILYSECODNSOFFSET+0, DAILYSECODNSOFFSET-20) stores the desided number of daily RTC error compensation to eeprom.
 - **<<DAILYSECODNSOFFSET** print daily seconds of  RTC error correction setting stored in the eeprom
-- **>>DATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time, takes standard time, *not DST*.
-- **<<EEPROMDATA** print eeprom date, time and clock status information
+- **>>RTCDATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time, takes standard time, *not DST*.
 - **<<RTCDATETIME** print RTC date and time
+- **<<EEPROMDATA** print eeprom date, time and clock status information
+
 
 
 
