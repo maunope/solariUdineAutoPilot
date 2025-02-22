@@ -191,6 +191,17 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **A:** Hikes! that's not OK! try a different RTC module, then check your board for errors on I2C bus pullup resistors and +5v power. I've tested the board design powering I2C devices straight from a tension regulator bypassing the Arduino's internal one, either do the same or dig  sleep configurations to figure how to keep the RTC powered during sleep. In case you figure something out, open a PR here :-)
 
+**Q:** I got a RTC failure message/blink and then the board rebooted
+
+**A:** Your RTC went nuts! it happens every now and then with cheap *ss modules, mine's MBTF is around 4 months, the sketch tries its best to recover to the last timestamp that made sense if it detects the RTC is acting up
+
+**Q:** No matter what I do, the clock keeps flipping!
+
+**A:** The RTC module is returning wrong timestamps, and the checks I've put in place are not working. :-( 
+    compile the sketch in debug mode, use serial commands to check what timestamp is recorded in the RTC module and fix it, 
+    realing eeprom time with RTC time, reboot, and check after a few minutes that the RTC module is behaving. If you wish, drop me an email about the problem including the timestamp you had in the RTC module and then one in you EEPROM (or, even better, figure what's wrong and open a PR :-) )
+
+
 **Q:** That PCB design is **lame**!
 
 **A:** It is. any help much appreciated! ;-)
@@ -200,6 +211,8 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 - Add support for bluetooth communication
 - Improve kicad design
 - Figure some predictable behavior for when RTC is known to be f*cked up, i.e start from 1970 and stop calculating dst
+- Finish String calss removal
+- Remove dependency from regexp library
 
 
 
