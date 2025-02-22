@@ -424,7 +424,7 @@ void parseSerialCommands(char command[]) {
       Serial.println("Boot timestamp : ");
       Serial.print(bootTime.timestamp());
   }
-  else if (ms.Match(">>DATETIME[0-9]+")) {
+  else if (ms.Match(">>RTCDATETIME[0-9]+")) {
     //TODO clean this crap
     String temp=String(command);
     int year = temp.substring(10, 14).toInt();
