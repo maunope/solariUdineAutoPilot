@@ -5,7 +5,7 @@
 #include <SparkFun_External_EEPROM.h>  //https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library
 
 
-//#define DEBUG_MODE
+#define DEBUG_MODE
 
 //never leave this flag on on regular operation, it pretty much defeats the purpose of using this board 
 //#define SET_COMPILE_TIME_TO_RTC
@@ -26,6 +26,32 @@ struct EepromData {
   int currentWrites = 0;
   bool pausedTillNextDay = false;
 };
+
+
+//debug mode redirects stdout to the serial port, this avoids the need for strings buffering
+#ifdef DEBUG_MODE
+// Define a custom putchar function to redirect output to Serial
+int putCharToSerial(char c, FILE *stream) {
+  if (stream == stdout) { // Check if it's standard output
+    Serial.write(c);
+  }
+  return 0;
+}
+
+// Declare a FILE stream for stdout (no initializer here!)
+FILE customStdOut;
+//printf macro, together with putCharToSerial driver debug messages straight to the Serial port,
+//stores string in Program Memory and appends a new line to each log line automatically
+#define DEBUG_PRINTF(format, ...) printf_P(PSTR(format "\n"),##__VA_ARGS__);
+#endif
+
+#ifndef DEBUG_MODE
+#define DEBUG_PRINTF(format, ...) // Nothing 
+#endif
+
+
+
+
 
 
 const unsigned long EEPROM_SIGNATURE = 0xD24F789F;
@@ -52,6 +78,9 @@ const int PULSE_DURATION_MILLIS = 400;
 // Udine controllers use 4s
 const int SECS_BETWEEN_PULSES = 3;
 
+//if the RTC module went ahead more than these seconds since last time it was read, then we can assume it went nuts
+//max difference should be 5s
+const int RTC_FUBAR_SECONDS = 30;
 
 DateTime bootTime = DateTime((unsigned long)0);
 DateTime lastCommandReceived = DateTime((unsigned long)0);
@@ -78,6 +107,9 @@ RTC_DS3231 rtc;
 ExternalEEPROM extEeprom;
 
 
+
+DateTime previousRTCDateTime=DateTime((unsigned long)0);;
+
 void setup() {
 
   // Init pins
@@ -92,7 +124,7 @@ void setup() {
   digitalWrite(FEEDBACK_LED_PIN, LOW);
 
   // Init Serial and i2c modules
-  Serial.begin(9600);
+  Serial.begin(19200);
 
   lcd.init();
   lcd.backlight();
@@ -101,7 +133,7 @@ void setup() {
   // check if the eeprom is available and initialize its parameters, check for
   // valid time in the eeprom is repeated in the loop
   if (!extEeprom.begin()) {
-    debugMessage("External eeprom Error");
+    DEBUG_PRINTF("External eeprom Error");
     blinkFeedbackLed(300, 300, 30);
     // reset
     asm volatile("  jmp 0");
@@ -114,11 +146,12 @@ void setup() {
   // Under no circumnstance read/write the RTC module when not ready!
   // if RTC is unavailabe sends a blink pattern and then resets
   if (!rtc.begin()) {
-    debugMessage("RTC Error");
+    DEBUG_PRINTF("RTC Error");
     blinkFeedbackLed(50, 300, 30);
     // reset
     asm volatile("  jmp 0");
   }
+  previousRTCDateTime=getRTCDateTime();
   
   
 
@@ -137,24 +170,19 @@ void setup() {
 
 
 // blinks the feedback led alternating given on/off time, for the given number
-// of times.
+// of times. restores initial state after blinking
 void blinkFeedbackLed(int onMillis, int offMillis, int iterations) {
+  int initialState=digitalRead(FEEDBACK_LED_PIN);
   for (int i = 0; i < iterations; i++) {
     digitalWrite(FEEDBACK_LED_PIN, HIGH);
     delay(onMillis);
     digitalWrite(FEEDBACK_LED_PIN, LOW);
     delay(offMillis);
   }
-  digitalWrite(FEEDBACK_LED_PIN, LOW);
+  digitalWrite(FEEDBACK_LED_PIN, initialState);
 }
 
 
-//printa a message to Serial port if in DEBUG_MODE
-void debugMessage(String message) {
-#ifdef DEBUG_MODE
-  Serial.println(message);
-#endif
-}
 
 // writes EepromData struct to the eeprom, spreading writes over pages to
 // maximize the eeprom life. if the eeprom has no record of the current page, a
@@ -162,29 +190,20 @@ void debugMessage(String message) {
 int writeTimeDataToEeprom(EepromData& eepromData) {
   const int eepromDataPagesSizeBytes = ceil(sizeof(EepromData) / (float)EEPROM_PAGE_SIZE_BYTES) * EEPROM_PAGE_SIZE_BYTES;
   const int eepromIndexDescriptorSizeBytes = ceil(sizeof(EepromIndexDescriptor) / (float)EEPROM_PAGE_SIZE_BYTES) * EEPROM_PAGE_SIZE_BYTES;
-
-  // debugMessage(String(sizeof(EepromData))+" a
-  // "+String(eepromDataPagesSizeBytes)+" b
-  // "+String((sizeof(EepromIndexDescriptor)))+" c
-  // "+String(eepromIndexDescriptorSizeBytes));
   EepromIndexDescriptor eepromIndexDescriptor;
   eepromIndexDescriptor.signature = 0;
 
   // check if first 4 bytes contain the required signature string
   extEeprom.get(0, eepromIndexDescriptor);
 
-  /*  debugMessage(String(EEPROM_SIGNATURE, HEX) +
-      " eepromIndexDescriptor.signature: " +
-      String(eepromIndexDescriptor.signature, HEX) +
-      " eepromIndexDescriptor.pageOffset: " +
-      String(eepromIndexDescriptor.pageOffset));*/
+
   // check if first 4 bytes contain the required signature string
 
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
     // EEPROM is not initialized, write the signature and default address and
     // set 0 writes in counter
-    debugMessage("EEprom not initialized, setting index page");
 
+    DEBUG_PRINTF("EEprom not initialized, setting index page");
     eepromIndexDescriptor.signature = EEPROM_SIGNATURE;
     // set to the number of bytes containing the descriptor
     eepromIndexDescriptor.pageOffset = eepromIndexDescriptorSizeBytes;
@@ -205,13 +224,8 @@ int writeTimeDataToEeprom(EepromData& eepromData) {
 
   // switch to next page if the number of writes on the current one exceeds the
   // desided value
-  //  in case of power failure currentWrites will be reset and the current page
-  //  will get more writes than
-  // planned, this is a fair tradeoff as outages are infrequent and updating the
-  // index page on each write would quickly wear it off
   if (currentEepromData.currentWrites > MAX_WRITE_PER_EEPROM_PAGE) {
-    // debugMessage(String(currentEepromData.currentWrites) + " ->next page "
-    // + String(eepromIndexDescriptor.pageOffset)); switch forward one page, if
+    // switch forward one page, if
     // we reached the top, start back from first page after index
     eepromIndexDescriptor.pageOffset =
       (eepromIndexDescriptor.pageOffset + eepromDataPagesSizeBytes < EEPROM_SIZE_BYTES)
@@ -221,8 +235,6 @@ int writeTimeDataToEeprom(EepromData& eepromData) {
     extEeprom.put(0, eepromIndexDescriptor);
     // reset writes counter in currentEepromData
     eepromData.currentWrites = 0;
-    // debugMessage("New page offset: " +
-    // String(eepromIndexDescriptor.pageOffset));
   } else {
     // write to eeprom and track we have +1 write on the current page
     eepromData.currentWrites = eepromData.currentWrites + 1;
@@ -243,7 +255,8 @@ int readEepromData(EepromData& eepromData) {
 
   // check if first 4 bytes contain the required signature string
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
-    debugMessage("EEprom is not initialized: got " + String(eepromIndexDescriptor.signature, HEX) + " instead of " + String(EEPROM_SIGNATURE, HEX));
+    //todo check if this works
+    DEBUG_PRINTF("EEprom is not initialized: got %X instead of %X ",eepromIndexDescriptor.signature,EEPROM_SIGNATURE);
     // EEPROM is not initialized, return 0
     eepromData.dateTime = WINT_MAX;
     eepromData.nextPulsePolarity = 0;
@@ -267,7 +280,7 @@ int getDailySecondsOffsetFromEpprom() {
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
     // EEPROM is not initialized, write the signature and default address and
     // set 0 writes in counter
-    debugMessage("getDailySecondsOffsetFromEpprom, EEprom not initialized, canll writeEepromData first");
+    DEBUG_PRINTF("getDailySecondsOffsetFromEpprom, EEprom not initialized, canll writeEepromData first");
     return 0;
   }
   return eepromIndexDescriptor.dailySecondsOffset;
@@ -287,7 +300,7 @@ int writeDailySecondsOffsetToEpprom(int dailySecondsOffset) {
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
     // EEPROM is not initialized, write the signature and default address and
     // set 0 writes in counter
-    debugMessage("writeDailySecondsOffsetToEpprom, EEprom not initialized, canll writeEepromData first");
+    DEBUG_PRINTF("writeDailySecondsOffsetToEpprom, EEprom not initialized, canll writeEepromData first");
     return -1;
   }
   eepromIndexDescriptor.dailySecondsOffset=dailySecondsOffset;
@@ -302,16 +315,19 @@ int writeDailySecondsOffsetToEpprom(int dailySecondsOffset) {
 // returns true if give DateTime is DST, applies Central Europe rules
 bool isDST(DateTime time) {
   // Calculate the last Sunday of March
-  DateTime dstStart = DateTime((String(time.year()) + "-03-31%02:00:00").c_str());
+   //TODO check this works
+   char buf[20];
+   sprintf("%s-03-31%02:00:00",buf);
+   DateTime dstStart = DateTime(buf);
   while (dstStart.dayOfTheWeek() != 0) {  // 1 represents Sunday
     dstStart = dstStart - TimeSpan(SECONDS_PER_DAY);
   }
   // Calculate the last Sunday of October
-  DateTime dstEnd = DateTime((String(time.year()) + "-10-31%02:00:00").c_str());
+  sprintf("%s-10-31%02:00:00",buf);
+  DateTime dstEnd = DateTime(buf);
   while (dstEnd.dayOfTheWeek() != 0) {  // 1 represents Sunday
     dstEnd = dstEnd - TimeSpan(SECONDS_PER_DAY);
   }
-  //debugMessage("idstmethod time: "+time.timestamp()+" dststart: "+dstStart.timestamp()+" dstEnd: "+dstEnd.timestamp() +" isDST: "+String((time >= dstStart && time <= dstEnd)));
   return (time >= dstStart && time <= dstEnd);
 }
 
@@ -320,7 +336,6 @@ bool isDST(DateTime time) {
 // debug mode, inits communication with rtc on each read and returns 0 in case
 // of failure.
 DateTime getRTCDateTime() {
-// return SECONDSOFFSET + (millis() / 1000);
 #ifdef DEBUG_MODE
   if (!rtc.begin()) {
     return DateTime((uint32_t)0);
@@ -364,6 +379,7 @@ void sendPulse(EepromData& eepromData, int PULSE_DURATION_MILLIS) {
 // DateTime
 void pulseDebugStringToDisplay(EepromData eepromData, DateTime dstAdjDateTime, bool motorPulseEnable, bool isDST) {
 #ifdef DEBUG_MODE
+  //TODO use buffers here
   String dstAdjDateTimeString = dstAdjDateTime.timestamp();
   lcd.setCursor(0, 0);
   lcd.print("R:" + dstAdjDateTimeString.substring(dstAdjDateTimeString.indexOf("T") + 1));
@@ -379,76 +395,87 @@ void pulseDebugStringToDisplay(EepromData eepromData, DateTime dstAdjDateTime, b
 #endif
 }
 
+//TODO remove string usage
 // crude serial commands parser, please behave, there's 100 ways this can break
-void parseSerialCommands(String command) {
+void parseSerialCommands(char command[]) {
   // match state object
   MatchState ms;
-  ms.Target(command.c_str());
-  debugMessage(command);
+  ms.Target(command);
   if (ms.Match(">>DAILYSECONDSOFFSET[+-][0-9]+$")) {
-    command.replace(">>DAILYSECONDSOFFSET", "");
-    int dailySecondsOffset=command.toInt();
+    char buf[3];
+    buf[0] = command[21];
+    buf[1] = command[22];
+    buf[3] = command[23];
+    int dailySecondsOffset=atoi(buf);
     if (writeDailySecondsOffsetToEpprom(dailySecondsOffset)){
-      Serial.println("Wrote "+String(dailySecondsOffset)+" daily seconds offset to eeprom");
+      Serial.println(dailySecondsOffset);
+      Serial.print(F("daily seconds offset wrote  to eeprom"));
     }
     else
     {
-            Serial.println("Failed to write "+String(dailySecondsOffset)+" daily seconds offset to eeprom");
+            Serial.println(F("Failed to write daily seconds offset to eeprom"));
     }
   }
   else if (ms.Match("<<DAILYSECONDSOFFSET")) {
-      Serial.println("Daily seconds offset stored in eeprom :"+String(getDailySecondsOffsetFromEpprom()));
+      Serial.println("Daily seconds offset stored in eeprom : ");
+      Serial.print(getDailySecondsOffsetFromEpprom());
   }
   else if (ms.Match("<<BOOTTIMESTAMP")) {
-      Serial.println("Boot timestamp :"+bootTime.timestamp());
+      Serial.println("Boot timestamp : ");
+      Serial.print(bootTime.timestamp());
   }
-  else if (ms.Match(">>DATETIME[0-9]+")) {
-    int year = command.substring(10, 14).toInt();
-    int month = command.substring(14, 16).toInt();
-    int day = command.substring(16, 18).toInt();
-    int hour = command.substring(18, 20).toInt();
-    int minute = command.substring(20, 22).toInt();
-    int second = command.substring(22, 24).toInt();
+  else if (ms.Match(">>RTCDATETIME[0-9]+")) {
+    //TODO clean this crap
+    String temp=String(command);
+    int year = temp.substring(10, 14).toInt();
+    int month = temp.substring(14, 16).toInt();
+    int day = temp.substring(16, 18).toInt();
+    int hour = temp.substring(18, 20).toInt();
+    int minute = temp.substring(20, 22).toInt();
+    int second = temp.substring(22, 24).toInt();
     DateTime manualDateTime = DateTime(year, month, day, hour, minute, second);
 
     //if you're dialing in serial comments, likely somehtign went wrong, checking RTC is answering just in case
     if (rtc.begin()) {
       rtc.adjust(manualDateTime);
-      Serial.println("RTC module time adjusted");
+      Serial.println(F("RTC module time adjusted"));
     } else {
-      Serial.println("Unable to set time, RTC not available");
+      Serial.println(F("Unable to set time, RTC not available"));
     }
-  } else if (command.equals(">>COMPILEDATETIME")) {
+  } else if (ms.Match(">>COMPILEDATETIME")) {
     if (rtc.begin()) {
       rtc.adjust(getStandardTime(DateTime(F(__DATE__), F(__TIME__))));
-      Serial.println("RTC module time adjusted to sketch compile date time: (not DST compensated) " + getRTCDateTime().timestamp());
+      Serial.println("RTC module time adjusted to sketch compile date time: (not DST compensated) ");
+      Serial.println(getRTCDateTime().timestamp());
+      previousRTCDateTime=getRTCDateTime();
     } else {
-      Serial.println("Unable to set time, RTC not available");
+      Serial.println(F("Unable to set time, RTC not available"));
     }
-  } else if (command.equals("<<RTCDATETIME")) {
+  } else if (ms.Match("<<RTCDATETIME")) {
     if (rtc.begin()) {
       DateTime RTCDateTime = getRTCDateTime();
       String RTCDateTimeString = RTCDateTime.timestamp();
       Serial.println(RTCDateTimeString.substring(RTCDateTimeString.indexOf("T") + 1));
     } else {
-      Serial.println("Unable to get time, RTC not available");
+      Serial.println(F("Unable to get time, RTC not available"));
     }
-  } else if (command.equals("<<EEPROMDATA")) {
+  } else if (ms.Match("<<EEPROMDATA")) {
     EepromData eepromData;
     if (readEepromData(eepromData) > 0) {
       DateTime eepromDateTime = eepromData.dateTime;
-      debugMessage(eepromDateTime.timestamp()
+      Serial.println(eepromDateTime.timestamp()
                    + String(eepromData.nextPulsePolarity > 0 ? "+" : "-") + " "
                    + String(isDST(eepromData.dateTime) ? "D" : "W") + " "
                    + String(eepromData.pausedTillNextDay ? "P" : "R")
                    + " wrOnPp: " + String(eepromData.currentWrites));
     } else {
-      Serial.println("Unable to read eeprom data");
+      Serial.println(F("Unable to read eeprom data"));
     }
-  } else if (command.equals("<<COMPILEDATETIME")) {
+  } else if (ms.Match("<<COMPILEDATETIME")) {
     Serial.println("Software compiled on: " + getStandardTime(DateTime(F(__DATE__), F(__TIME__))).timestamp());
-  } else if (!command.equals("")){
-    Serial.println("Unknown command: " + command);
+  } else if (!ms.Match("")){
+    Serial.println(F("Unknown command: "));
+    Serial.println(command);
   }
 }
 
@@ -461,26 +488,45 @@ void parseSerialCommands(String command) {
 // - Go in deep sleep for a while if motor enable is ON 
 void loop() {
 
-  if (Serial.available() > 0) {
-    String command = "";
+
+    if (Serial.available() > 0) {
+    char command[128];
     int i = 0;
-    while (Serial.available() > 0 && i < 64) {
+    while (Serial.available() > 0 && i < 127) {
       char c = Serial.read();
       if (c == '\n') {
         break;  // Break when newline character is received
       }
-      command += c;
+      command[i] = c;
       i++;
     }
+    command[i] = '\0';
     parseSerialCommands(command);
   }
-
 
   bool motorPulseEnable = digitalRead(MOTOR_PULSE_ENABLE_PIN) == HIGH;
 
   // RTCDateTime is the time coming from the battery backed Real Time Clock
   // module, always in standard time
   DateTime RTCDateTime = getRTCDateTime();
+
+  //sometimes cheap *ss RTC modules go nuts,
+  //this simple check restores the last assumed valid RTC time in case what comes from the module is obviously off
+  //I'm not compensating the time spent looping since last update, which should be <5seconds anyway
+  //I'm making the assumption the RTC timestamp was good at boot. 
+  //the remote risk of RTC fucking up right after boot or while the board is powered off is left unchecked, worst that will happen is 
+  //the board will drive the clock to a wrong timestamp, which users will notice pretty easily
+  #ifndef DEBUG_MODE
+  if ((RTCDateTime>previousRTCDateTime && (RTCDateTime-previousRTCDateTime).totalseconds()>RTC_FUBAR_SECONDS) || RTCDateTime<previousRTCDateTime ){
+    Serial.println(F("RTC Module went nuts! restoring last assumed good time and reebooting"));
+    rtc.adjust(previousRTCDateTime);
+    blinkFeedbackLed(50, 300, 30); //rtc failure led blink
+    asm volatile("  jmp 0");
+  }
+  #endif
+  previousRTCDateTime=RTCDateTime;
+  
+  
   // DST adjusted version of RTCDateTime
   DateTime dstAdjRTCDateTime = getDSTAdjustedTime(RTCDateTime);
 
@@ -493,15 +539,15 @@ void loop() {
     if (dailySecondsOffset!=0){
       RTCDateTime=RTCDateTime+TimeSpan(dailySecondsOffset);
       rtc.adjust(RTCDateTime); 
-      debugMessage("Applied daily seconds offset: "+String(dailySecondsOffset));
+      DEBUG_PRINTF("Applied daily seconds offset: %d",dailySecondsOffset);
     }
     lastDailyOffsetCorrection=RTCDateTime;
   }
 
-  // self reset every week, just in case I f*cked up and some variable would
-  // overflow left unchecked
+  // self reset every week+5minutes, just in case I f*cked up and some variable would
+  // overflow left unchecked. 
   //Serial.println(String((RTCDateTime-bootTime).totalseconds())+" "+String(SECONDS_PER_DAY*7));
-  if ((RTCDateTime - bootTime).totalseconds() >= SECONDS_PER_DAY * 7) {
+  if ((RTCDateTime - bootTime).totalseconds() >= (SECONDS_PER_DAY * 7)+300) {
     asm volatile("  jmp 0");
   }
 
@@ -510,13 +556,12 @@ void loop() {
   EepromData eepromData;
   readEepromData(eepromData);
   // if EEprom has no valid time set, skip clock movement and notify user
-  // debugMessage("serial "+String(eepromData.dateTime.unixtime())+" "+String(eepromData.pausedTillNextDay)+" "+String(eepromData.dateTime.isValid()));
   if (!eepromData.dateTime.isValid()) {
 #ifdef DEBUG_MODE
     lcd.setCursor(0, 0);
     lcd.print("Adj. time");
 #endif
-    debugMessage("No valid time set in eeprom, please perform manual adjustment");
+    DEBUG_PRINTF("No valid time set in eeprom, please perform manual adjustment");
 
     blinkFeedbackLed(300, 50, 5);
   } else {
@@ -551,7 +596,7 @@ void loop() {
       long rtcEepromTimeDiffSeconds = (dstAdjRTCDateTime - eepromData.dateTime).totalseconds();
       //Serial.println(RTCDateTime.timestamp()+" "+lastPulseTime.timestamp());
       if (((rtcEepromTimeDiffSeconds > SEC_IN_MINUTE) && ((RTCDateTime - lastPulseTime).totalseconds() > SECS_BETWEEN_PULSES)) || bookedPulseAuto) {
-        debugMessage(String(rtcEepromTimeDiffSeconds) + " " + String(bookedPulseAuto));
+        DEBUG_PRINTF("rtcEepromTimeDiffSeconds: %d bookedPulseAuto: %d",rtcEepromTimeDiffSeconds,bookedPulseAuto);
         //check if we need to wait till tomorrow
         if ((rtcEepromTimeDiffSeconds / SEC_IN_MINUTE >= MAX_CATCHUP_MINUTES) && !bookedPulseAuto) {
           if (eepromData.pausedTillNextDay == false) {
@@ -570,14 +615,12 @@ void loop() {
             lastPulseTime = RTCDateTime;
             bookedPulseAuto = false;
           } else {
-            debugMessage("Delaying synchronization pulse");
+            DEBUG_PRINTF("Delaying synchronization pulse");
             bookedPulseAuto = true;
           }
         }
       }
     }
-
-    //debugMessage(String("DebugB ")+String(isDST(RTCDateTime))+" dstAdjRTCDateTime: "+String(dstAdjRTCDateTime.timestamp())+" RTCDateTime: "+String(RTCDateTime.timestamp()));
     pulseDebugStringToDisplay(eepromData, dstAdjRTCDateTime, motorPulseEnable, isDST(RTCDateTime));
   }
   // handle inputs from pushbutton
@@ -587,7 +630,6 @@ void loop() {
   if (digitalRead(PUSH_BUTTON_PIN) == HIGH) {
 
     lastCommandReceived = RTCDateTime;
-    //lastButtonPushMillis=millis();
     if (pushButtonPressedMillis == 0) {
       pushButtonPressedMillis = millis();
     }
@@ -602,24 +644,24 @@ void loop() {
       writeTimeDataToEeprom(eepromData);
       //this helps when debugging, clock will start self adjustig immediately
       lastPulseTime = dstAdjRTCDateTime;
-      debugMessage("Manual Adjustment completed");
+      DEBUG_PRINTF("Manual Adjustment completed");
       delay(200);  //avoid bounces
       pushButtonPressedMillis = 0;
     }
   }
   // short press
   else if (pushButtonPressedMillis > 0 || bookedPulseManual) {
-    debugMessage("Manual pulse requested");
+    DEBUG_PRINTF("Manual pulse requested");
     pushButtonPressedMillis = 0;
     if (digitalRead(WAIT_NEXT_PULSE_CYCLE_PIN) == LOW) {
       blinkFeedbackLed(100, 0, 1);
       sendPulse(eepromData, PULSE_DURATION_MILLIS);
       eepromData.dateTime = eepromData.dateTime + TimeSpan(SEC_IN_MINUTE);
       writeTimeDataToEeprom(eepromData);
-      debugMessage("Sent a manual pulse " + String((bookedPulseManual ? "booked" : "")));
+      DEBUG_PRINTF("Sent a manual pulse %s" ,(bookedPulseManual ? "booked" : ""));
       bookedPulseManual = false;
     } else {
-      debugMessage("Delaying manual pulse");
+      DEBUG_PRINTF("Delaying manual pulse");
       bookedPulseManual = true;
     }
   }
@@ -631,7 +673,6 @@ void loop() {
 //doesn't sleep for 2x pulse delay after a pulse was sent
 //won't sleep if motorPulseEnable is off, this helps debugging :-)
 
-//Serial.println(String(millis())+" "+String(lastButtonPushMillis)+" "+String(sleepDisableMillis)+" "+String((RTCDateTime - lastPulseTime).totalseconds())+" "+String(2*SECS_BETWEEN_PULSES)+" "+String(bookedPulseAuto)+" "+String(bookedPulseManual)+" "+String(motorPulseEnable));
 #ifndef DEBUG_MODE
   //motorPulseEnable = digitalRead(MOTOR_PULSE_ENABLE_PIN) == HIGH;
   /*
@@ -643,16 +684,8 @@ void loop() {
   if (motorPulseEnable && (RTCDateTime - lastPulseTime).totalseconds() > (1.2 * SECS_BETWEEN_PULSES) && (RTCDateTime - lastCommandReceived).totalseconds() > NO_SLEEP_AFT_COMM_SECS && !(bookedPulseAuto || bookedPulseManual)) {
     
     
-   // Terminate all I2C connections
-    //Wire.end(); 
-    
-    // Set SDA and SCL pins to input pullup mode
-   // pinMode(2, INPUT_PULLUP);
-    //pinMode(3, INPUT_PULLUP);
-
     //this allows close to 95% sleep time, considering the loop takes 50ms, while retaining ease of use
     //don't change the modules left ON, or RTC will start to drift (tested on a knock off Arduino Leonardo w/ a chep *ss RS2321 bough off Amazon )
-    //LowPower.idle(SLEEP_1S, ADC_ON, TIMER4_OFF, TIMER3_OFF, TIMER1_OFF, TIMER0_OFF, SPI_ON, USART1_OFF, TWI_ON, USB_OFF);
     LowPower.powerDown(SLEEP_4S, ADC_OFF, BOD_ON);
     //Wire.begin();
    // rtc.begin();
@@ -663,6 +696,7 @@ void loop() {
       lastCommandReceived = RTCDateTime;
     }
     delay(200);
+
     
     #ifdef DEBUG_MODE
     //this should never be reached

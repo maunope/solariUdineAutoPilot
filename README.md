@@ -24,6 +24,7 @@ The software tries to mitigate strain on the flip clock limiting the number and 
 - Turns are limited to 1 every 3 seconds (manual step adjustment bypasses this)
 - If the clock is more than 120 minutes behind, movement is paused till the next day (a halted clock displays the right time once a day after all **:-)**)
 - If the eeprom or rtc module fail, no pulses are sent to the motor
+- If the rtc module crashes, attempts are made to restore the last known consistent timestamp
 - A hardware circuit limits pulse duration and frequency to 1 second.
 - the circuit board has hardware protection avoiding prolonged motor pulses, set to 1 second. Once a pulse is sent, following ones are delayed until the hw protection has completed its cycle. Note that it is totally possible to build the board without the 555 timer, just hardwire L293D enable pins to high, software will work just fine.
 
@@ -128,9 +129,10 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 - **<<COMPILEDATETIME** print the sketch build timestamp
 - **>>DAILYSECODNSOFFSET[+-][0-9]+$** (i.e: >>DAILYSECODNSOFFSET+10, DAILYSECODNSOFFSET+0, DAILYSECODNSOFFSET-20) stores the desided number of daily RTC error compensation to eeprom.
 - **<<DAILYSECODNSOFFSET** print daily seconds of  RTC error correction setting stored in the eeprom
-- **>>DATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time, takes standard time, *not DST*.
-- **<<EEPROMDATA** print eeprom date, time and clock status information
+- **>>RTCDATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time, takes standard time, *not DST*.
 - **<<RTCDATETIME** print RTC date and time
+- **<<EEPROMDATA** print eeprom date, time and clock status information
+
 
 
 
@@ -191,6 +193,17 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 
 **A:** Hikes! that's not OK! try a different RTC module, then check your board for errors on I2C bus pullup resistors and +5v power. I've tested the board design powering I2C devices straight from a tension regulator bypassing the Arduino's internal one, either do the same or dig  sleep configurations to figure how to keep the RTC powered during sleep. In case you figure something out, open a PR here :-)
 
+**Q:** I got a RTC failure message/blink and then the board rebooted
+
+**A:** Your RTC went nuts! it happens every now and then with cheap *ss modules, mine's MBTF is around 4 months, the sketch tries its best to recover to the last timestamp that made sense if it detects the RTC is acting up
+
+**Q:** No matter what I do, the clock keeps flipping!
+
+**A:** The RTC module is returning wrong timestamps, and the checks I've put in place are not working. :-( 
+    compile the sketch in debug mode, use serial commands to check what timestamp is recorded in the RTC module and fix it, 
+    realing eeprom time with RTC time, reboot, and check after a few minutes that the RTC module is behaving. If you wish, drop me an email about the problem including the timestamp you had in the RTC module and then one in you EEPROM (or, even better, figure what's wrong and open a PR :-) )
+
+
 **Q:** That PCB design is **lame**!
 
 **A:** It is. any help much appreciated! ;-)
@@ -200,6 +213,8 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 - Add support for bluetooth communication
 - Improve kicad design
 - Figure some predictable behavior for when RTC is known to be f*cked up, i.e start from 1970 and stop calculating dst
+- Finish String calss removal
+- Remove dependency from regexp library
 
 
 
