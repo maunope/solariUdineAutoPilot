@@ -303,7 +303,6 @@ int writeDailySecondsOffsetToEpprom(int dailySecondsOffset) {
 bool isDST(DateTime time) {
   // Calculate the last Sunday of March
   DateTime dstStart = DateTime((String(time.year()) + "-03-31%02:00:00").c_str());
-  //debugMessage(String("abba ")+String(dstStart.dayOfTheWeek()));
   while (dstStart.dayOfTheWeek() != 0) {  // 1 represents Sunday
     dstStart = dstStart - TimeSpan(SECONDS_PER_DAY);
   }
