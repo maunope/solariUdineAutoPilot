@@ -1,11 +1,16 @@
+#define DEBUG_MODE
+
+#ifdef DEBUG_MODE
 #include <LiquidCrystal_I2C.h>         //https://github.com/johnrickman/LiquidCrystal_I2C
+#endif
+
 #include <LowPower.h>                  //https://github.com/rocketscream/Low-Power
 #include <RTClib.h>                    //https://github.com/adafruit/RTClib
 #include <Regexp.h>                    //https://github.com/nickgammon/Regexp
 #include <SparkFun_External_EEPROM.h>  //https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library
 
 
-#define DEBUG_MODE
+
 
 //never leave this flag on on regular operation, it pretty much defeats the purpose of using this board 
 //#define SET_COMPILE_TIME_TO_RTC
@@ -317,13 +322,13 @@ bool isDST(DateTime time) {
   // Calculate the last Sunday of March
    //TODO check this works
    char buf[20];
-   sprintf("%s-03-31%02:00:00",buf);
+   sprintf(buf,"%s-03-31%02:00:00");
    DateTime dstStart = DateTime(buf);
   while (dstStart.dayOfTheWeek() != 0) {  // 1 represents Sunday
     dstStart = dstStart - TimeSpan(SECONDS_PER_DAY);
   }
   // Calculate the last Sunday of October
-  sprintf("%s-10-31%02:00:00",buf);
+  sprintf(buf,"%s-10-31%02:00:00");
   DateTime dstEnd = DateTime(buf);
   while (dstEnd.dayOfTheWeek() != 0) {  // 1 represents Sunday
     dstEnd = dstEnd - TimeSpan(SECONDS_PER_DAY);
