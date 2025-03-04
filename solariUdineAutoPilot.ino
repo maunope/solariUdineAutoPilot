@@ -6,6 +6,7 @@
 
 #include <LowPower.h>                  //https://github.com/rocketscream/Low-Power
 #include <RTClib.h>                    //https://github.com/adafruit/RTClib
+#include <Regexp.h>                    //https://github.com/nickgammon/Regexp
 #include <SparkFun_External_EEPROM.h>  //https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library
 
 
@@ -133,6 +134,11 @@ void setup() {
   // Init Serial and i2c modules
   Serial.begin(19200);
 
+#ifdef DEBUG_MODE
+  //if in debug mode, redirect stdout to serial
+  fdev_setup_stream(&customStdOut, putCharToSerial, NULL, _FDEV_SETUP_WRITE);
+  stdout = &customStdOut; // Redirect stdout to our stream
+#endif
 
   Wire.begin();
   Wire.setClock(400000);
@@ -285,7 +291,7 @@ int readEepromData(EepromData& eepromData) {
     return -1;  // Indicate that EEPROM is not initialized
   }
 
-   extEeprom.get(eepromIndexDescriptor.pageOffset, eepromData);
+  extEeprom.get(eepromIndexDescriptor.pageOffset, eepromData);
   return 1;  // Data read successfully
 }
 
@@ -338,13 +344,13 @@ bool isDST(DateTime time) {
   // Calculate the last Sunday of March
   //TODO check this works
   char buf[20];
-  sprintf(buf, "%d-03-31%%02:00:00",time.year());
+  sprintf(buf, "%d-03-31%%02:00:00", time.year());
   DateTime dstStart = DateTime(buf);
   while (dstStart.dayOfTheWeek() != 0) {  // 1 represents Sunday
     dstStart = dstStart - TimeSpan(SECONDS_PER_DAY);
   }
   // Calculate the last Sunday of October
-  sprintf(buf, "%d-10-31%%02:00:00",time.year());
+  sprintf(buf, "%d-10-31%%02:00:00", time.year());
   DateTime dstEnd = DateTime(buf);
   while (dstEnd.dayOfTheWeek() != 0) {  // 1 represents Sunday
     dstEnd = dstEnd - TimeSpan(SECONDS_PER_DAY);
@@ -454,7 +460,7 @@ void parseSerialCommands(char command[]) {
     int hour = temp.substring(21, 23).toInt();
     int minute = temp.substring(23, 25).toInt();
     int second = temp.substring(25, 27).toInt();
-   
+
     DateTime manualDateTime = DateTime(year, month, day, hour, minute, second);
 
     //if you're dialing in serial comments, likely somehtign went wrong, checking RTC is answering just in case
@@ -477,7 +483,7 @@ void parseSerialCommands(char command[]) {
     if (rtc.begin()) {
       DateTime RTCDateTime = getRTCDateTime();
       Serial.println(RTCDateTime.timestamp());
-      
+
     } else {
       Serial.println(F("Unable to get time, RTC not available"));
     }
@@ -510,7 +516,7 @@ void parseSerialCommands(char command[]) {
 // - Go in deep sleep for a while if motor enable is ON
 void loop() {
 
-  
+
 
   if (Serial.available() > 0) {
     char command[128];
