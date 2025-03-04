@@ -6,9 +6,7 @@
 
 #include <LowPower.h>                  //https://github.com/rocketscream/Low-Power
 #include <RTClib.h>                    //https://github.com/adafruit/RTClib
-#include <Regexp.h>                    //https://github.com/nickgammon/Regexp
 #include <SparkFun_External_EEPROM.h>  //https://github.com/sparkfun/SparkFun_External_EEPROM_Arduino_Library
-
 
 
 
@@ -425,33 +423,37 @@ void pulseDebugStringToDisplay(EepromData eepromData, DateTime dstAdjDateTime, b
 //TODO remove string usage
 // crude serial commands parser, please behave, there's 100 ways this can break
 void parseSerialCommands(char command[]) {
-  // match state object
-  MatchState ms;
-  ms.Target(command);
-  if (ms.Match(">>DAILYSECONDSOFFSET[+-][0-9]+$")) {
+
+  if (strncmp(command, ">>DAILYSECONDSOFFSET", 20) == 0 && (command[20] == '+' || command[20] == '-' ) && isDigit(command[21]) && isDigit(command[22]) && isDigit(command[23])) {
+
     char buf[3];
     buf[0] = command[21];
     buf[1] = command[22];
-    buf[3] = command[23];
+    buf[2] = command[23];
+    Serial.println(buf);
     int dailySecondsOffset = atoi(buf);
     if (writeDailySecondsOffsetToEpprom(dailySecondsOffset)) {
       Serial.println(dailySecondsOffset);
-      Serial.print(F("daily seconds offset wrote  to eeprom"));
+      Serial.println(F("daily seconds offset wrote  to eeprom"));
     }
     else
     {
       Serial.println(F("Failed to write daily seconds offset to eeprom"));
     }
   }
-  else if (ms.Match("<<DAILYSECONDSOFFSET")) {
-    Serial.println("Daily seconds offset stored in eeprom : ");
-    Serial.print(getDailySecondsOffsetFromEpprom());
+  else if (strcmp(command, "<<DAILYSECONDSOFFSET") == 0) {
+    Serial.println(getDailySecondsOffsetFromEpprom());
   }
-  else if (ms.Match("<<BOOTTIMESTAMP")) {
-    Serial.println("Boot timestamp : ");
-    Serial.print(bootTime.timestamp());
+  else if (strcmp(command, "<<BOOTTIMESTAMP") == 0) {
+    Serial.println(bootTime.timestamp());
   }
-  else if (ms.Match(">>RTCDATETIME[0-9]+")) {
+  else if (strncmp(command, ">>RTCDATETIME", 13) == 0) {
+    for (int i = 13; i < 27; i++) {
+      if (!isDigit(command[i])) {
+        Serial.println(F("Wrong timestamp format, yyyymmddhhmmss required"));
+        return;
+      }
+    }
     //TODO clean this crap
     String temp = String(command);
     int year = temp.substring(13, 17).toInt();
@@ -470,7 +472,7 @@ void parseSerialCommands(char command[]) {
     } else {
       Serial.println(F("Unable to set time, RTC not available"));
     }
-  } else if (ms.Match(">>COMPILEDATETIME")) {
+  } else if (strcmp(command, ">>COMPILEDATETIME") == 0) {
     if (rtc.begin()) {
       rtc.adjust(getStandardTime(DateTime(F(__DATE__), F(__TIME__))));
       Serial.println("RTC module time adjusted to sketch compile date time: (not DST compensated) ");
@@ -479,29 +481,39 @@ void parseSerialCommands(char command[]) {
     } else {
       Serial.println(F("Unable to set time, RTC not available"));
     }
-  } else if (ms.Match("<<RTCDATETIME")) {
+  } else if (strcmp(command, "<<RTCDATETIME") == 0) {
     if (rtc.begin()) {
       DateTime RTCDateTime = getRTCDateTime();
+      Serial.print(F("raw: "));
       Serial.println(RTCDateTime.timestamp());
+      Serial.print(F("DST adjusted: "));
+      Serial.println(getDSTAdjustedTime(RTCDateTime).timestamp());
 
     } else {
       Serial.println(F("Unable to get time, RTC not available"));
     }
-  } else if (ms.Match("<<EEPROMDATA")) {
+  } else if (strcmp(command, "<<EEPROMDATA") == 0) {
     EepromData eepromData;
     if (readEepromData(eepromData) > 0) {
       DateTime eepromDateTime = eepromData.dateTime;
-      Serial.println(eepromDateTime.timestamp()
-                     + String(eepromData.nextPulsePolarity > 0 ? "+" : "-") + " "
-                     + String(isDST(eepromData.dateTime) ? "D" : "W") + " "
-                     + String(eepromData.pausedTillNextDay ? "P" : "R")
-                     + " wrOnPp: " + String(eepromData.currentWrites));
+      Serial.println("");
+      Serial.print(eepromDateTime.timestamp());
+      Serial.print(" ");
+      Serial.print(eepromData.nextPulsePolarity > 0 ? "+" : "-");
+      Serial.print(" ");
+      Serial.print(isDST(eepromData.dateTime) ? "D" : "W");
+      Serial.print(" ");
+      Serial.print(eepromData.pausedTillNextDay ? "P" : "R");
+      Serial.print(" wrOnPp: ");
+      Serial.println(eepromData.currentWrites);
     } else {
       Serial.println(F("Unable to read eeprom data"));
     }
-  } else if (ms.Match("<<COMPILEDATETIME")) {
-    Serial.println("Software compiled on: " + getStandardTime(DateTime(F(__DATE__), F(__TIME__))).timestamp());
-  } else if (!ms.Match("")) {
+  } else if (strcmp(command, "<<COMPILEDATETIME") == 0) {
+    Serial.println("");
+    Serial.print(F("Software compiled on: "));
+    Serial.println(getStandardTime(DateTime(F(__DATE__), F(__TIME__))).timestamp());
+  } else if (!strcmp(command, "") == 0) {
     Serial.println(F("Unknown command: "));
     Serial.println(command);
   }

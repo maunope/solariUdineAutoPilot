@@ -127,7 +127,7 @@ One command per line, max 32 chars long. the parser is pretty crude, pls stick t
 - **<<BOOTTIMESTAMP** prints the curent boot timestamp
 - **>>COMPILEDATETIME** align RTC date and time to the sketch compilation timestamp
 - **<<COMPILEDATETIME** print the sketch build timestamp
-- **>>DAILYSECODNSOFFSET[+-][0-9]+$** (i.e: >>DAILYSECODNSOFFSET+10, DAILYSECODNSOFFSET+0, DAILYSECODNSOFFSET-20) stores the desided number of daily RTC error compensation to eeprom.
+- **>>DAILYSECODNSOFFSET[+-][0-9]{3}$** (i.e: >>DAILYSECODNSOFFSET+010, DAILYSECODNSOFFSET+000, DAILYSECODNSOFFSET-020) stores the desided number of daily RTC error compensation to eeprom.
 - **<<DAILYSECODNSOFFSET** print daily seconds of  RTC error correction setting stored in the eeprom
 - **>>RTCDATETIMEyyymmddhhmmss** (i.e: >>DATETTIME20241119235959) set RTC date and time, takes standard time, *not DST*.
 - **<<RTCDATETIME** print RTC date and time
