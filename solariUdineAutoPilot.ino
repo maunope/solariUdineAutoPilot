@@ -688,7 +688,7 @@ void loop() {
       eepromData.pausedTillNextDay = false;
       writeTimeDataToEeprom(eepromData);
       //this helps when debugging, clock will start self adjustig immediately
-      lastPulseTime = dstAdjRTCDateTime;
+      lastPulseTime = RTCDateTime;
       DEBUG_PRINTF("Manual Adjustment completed");
       delay(200);  //avoid bounces
       pushButtonPressedMillis = 0;
