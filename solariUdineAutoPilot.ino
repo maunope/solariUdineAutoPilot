@@ -1,4 +1,4 @@
-#define DEBUG_MODE
+//#define DEBUG_MODE
 
 #ifdef DEBUG_MODE
 #include <LiquidCrystal_I2C.h>         //https://github.com/johnrickman/LiquidCrystal_I2C
@@ -114,7 +114,47 @@ ExternalEEPROM extEeprom;
 
 
 
-DateTime previousRTCDateTime = DateTime((unsigned long)0);;
+DateTime previousRTCDateTime = DateTime((unsigned long)0);
+
+//sets DS3231 settings, crappy Ds3231 chips are finicky about power cuts and sometimes get their
+//settings corrupted, so we reset them to a known good state each time we boot
+void setDS3231Defaults() {
+  // Set Control Register to default low power mode
+  // DS3231_OFF sets INTCN=1, and disables SQW generation
+  rtc.writeSqwPinMode(DS3231_OFF);
+
+  // Disable Alarms (clears A1IE and A2IE bits in Control Register)
+  rtc.disableAlarm(1);
+  rtc.disableAlarm(2);
+
+  // Clear Alarm Flags (clears A1F and A2F bits in Status Register)
+  rtc.clearAlarm(1);
+  rtc.clearAlarm(2);
+
+  // Disable 32kHz output (clears EN32kHz bit in Status Register)
+  rtc.disable32K();
+  DEBUG_PRINTF("DS3231 defaults available through RTC lib set");
+  // Explicitly clear EOSC (Bit 7) to ensure oscillator runs on battery
+  // and clear BBSQW (Bit 6) to disable square wave on battery (low power).
+  // RTClib doesn't expose direct access to these bits for DS3231.
+  Wire.beginTransmission(0x68); // DS3231 I2C address
+  Wire.write(0x0E);             // Control Register
+  Wire.endTransmission();
+  Wire.requestFrom(0x68, 1);
+  if (Wire.available()) {
+    uint8_t ctrl = Wire.read();
+    ctrl &= ~0xC0; // Clear Bit 7 (EOSC) and Bit 6 (BBSQW)
+    Wire.beginTransmission(0x68);
+    Wire.write(0x0E);
+    Wire.write(ctrl);
+    Wire.endTransmission();
+    DEBUG_PRINTF("DS3231 defaults set");
+  }
+  else
+  {
+     DEBUG_PRINTF("Failes to set DS3231 defaults");
+  }
+}
 
 void setup() {
 
@@ -171,6 +211,7 @@ void setup() {
     // reset
     asm volatile("  jmp 0");
   }
+  setDS3231Defaults();
   previousRTCDateTime = getRTCDateTime();
 
 
@@ -282,7 +323,7 @@ int readEepromData(EepromData& eepromData) {
   // check if first 4 bytes contain the required signature string
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
     //todo check if this works
-    DEBUG_PRINTF("EEprom is not initialized: got %X instead of %X ", eepromIndexDescriptor.signature, EEPROM_SIGNATURE);
+    DEBUG_PRINTF("EEprom is not initialized: got %lX instead of %lX ", eepromIndexDescriptor.signature, EEPROM_SIGNATURE);
     // EEPROM is not initialized, return 0
     eepromData.dateTime = WINT_MAX;
     eepromData.nextPulsePolarity = 0;
@@ -294,7 +335,7 @@ int readEepromData(EepromData& eepromData) {
 }
 
 //reads daily seconds offset from eeprom, returns 0 if can't read
-int getDailySecondsOffsetFromEpprom() {
+int getDailySecondsOffsetFromEeprom() {
   const int eepromIndexDescriptorSizeBytes = ceil(sizeof(EepromIndexDescriptor) / (float)EEPROM_PAGE_SIZE_BYTES) * EEPROM_PAGE_SIZE_BYTES;
 
   EepromIndexDescriptor eepromIndexDescriptor;
@@ -305,14 +346,14 @@ int getDailySecondsOffsetFromEpprom() {
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
     // EEPROM is not initialized, write the signature and default address and
     // set 0 writes in counter
-    DEBUG_PRINTF("getDailySecondsOffsetFromEpprom, EEprom not initialized, canll writeEepromData first");
+    DEBUG_PRINTF("getDailySecondsOffsetFromEeprom, EEprom not initialized, call writeEepromData first");
     return 0;
   }
   return eepromIndexDescriptor.dailySecondsOffset;
 }
 
 // writes dailySecondsOffset in the eeprom, returns -1 if can't write
-int writeDailySecondsOffsetToEpprom(int dailySecondsOffset) {
+int writeDailySecondsOffsetToEeprom(int dailySecondsOffset) {
   const int eepromIndexDescriptorSizeBytes = ceil(sizeof(EepromIndexDescriptor) / (float)EEPROM_PAGE_SIZE_BYTES) * EEPROM_PAGE_SIZE_BYTES;
 
   EepromIndexDescriptor eepromIndexDescriptor;
@@ -325,7 +366,7 @@ int writeDailySecondsOffsetToEpprom(int dailySecondsOffset) {
   if (eepromIndexDescriptor.signature != EEPROM_SIGNATURE) {
     // EEPROM is not initialized, write the signature and default address and
     // set 0 writes in counter
-    DEBUG_PRINTF("writeDailySecondsOffsetToEpprom, EEprom not initialized, canll writeEepromData first");
+    DEBUG_PRINTF("writeDailySecondsOffsetToEpprom, EEprom not initialized, call writeEepromData first");
     return -1;
   }
   eepromIndexDescriptor.dailySecondsOffset = dailySecondsOffset;
@@ -432,7 +473,7 @@ void parseSerialCommands(char command[]) {
     buf[2] = command[23];
     Serial.println(buf);
     int dailySecondsOffset = atoi(buf);
-    if (writeDailySecondsOffsetToEpprom(dailySecondsOffset)) {
+    if (writeDailySecondsOffsetToEeprom(dailySecondsOffset)) {
       Serial.println(dailySecondsOffset);
       Serial.println(F("daily seconds offset wrote  to eeprom"));
     }
@@ -442,7 +483,7 @@ void parseSerialCommands(char command[]) {
     }
   }
   else if (strcmp(command, "<<DAILYSECONDSOFFSET") == 0) {
-    Serial.println(getDailySecondsOffsetFromEpprom());
+    Serial.println(getDailySecondsOffsetFromEeprom());
   }
   else if (strcmp(command, "<<BOOTTIMESTAMP") == 0) {
     Serial.println(bootTime.timestamp());
@@ -578,7 +619,7 @@ void loop() {
   //every now and then to spare eeprom writes, in case of a long power outage, a manual time set is advisable anyway
   if ((RTCDateTime - lastDailyOffsetCorrection).totalseconds() >= SECONDS_PER_DAY)
   {
-    int dailySecondsOffset = getDailySecondsOffsetFromEpprom();
+    int dailySecondsOffset = getDailySecondsOffsetFromEeprom();
     if (dailySecondsOffset != 0) {
       RTCDateTime = RTCDateTime + TimeSpan(dailySecondsOffset);
       rtc.adjust(RTCDateTime);
@@ -641,7 +682,7 @@ void loop() {
       long rtcEepromTimeDiffSeconds = (dstAdjRTCDateTime - eepromData.dateTime).totalseconds();
       //Serial.println(RTCDateTime.timestamp()+" "+lastPulseTime.timestamp());
       if (((rtcEepromTimeDiffSeconds > SEC_IN_MINUTE) && ((RTCDateTime - lastPulseTime).totalseconds() > SECS_BETWEEN_PULSES)) || bookedPulseAuto) {
-        DEBUG_PRINTF("rtcEepromTimeDiffSeconds: %d bookedPulseAuto: %d", rtcEepromTimeDiffSeconds, bookedPulseAuto);
+        DEBUG_PRINTF("rtcEepromTimeDiffSeconds: %ld bookedPulseAuto: %d", rtcEepromTimeDiffSeconds, bookedPulseAuto);
         //check if we need to wait till tomorrow
         if ((rtcEepromTimeDiffSeconds / SEC_IN_MINUTE >= MAX_CATCHUP_MINUTES) && !bookedPulseAuto) {
           if (eepromData.pausedTillNextDay == false) {
